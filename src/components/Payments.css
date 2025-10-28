@@ -1,0 +1,212 @@
+/* Payments Component Styles */
+
+.payments-container {
+  padding: 2rem 0;
+}
+
+.payments-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.payments-header h2 {
+  margin-bottom: 0.25rem;
+}
+
+.payments-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.payments-loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+/* Summary Cards */
+.payment-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  box-shadow: var(--shadow-md);
+}
+
+.summary-icon {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  padding: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.summary-content {
+  flex: 1;
+}
+
+.summary-label {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.summary-value {
+  color: white;
+  font-size: 1.875rem;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.summary-info {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* Payment Form */
+.payment-form {
+  margin-bottom: 2rem;
+}
+
+.payment-form h3 {
+  margin-bottom: 1.5rem;
+  font-size: 1.125rem;
+}
+
+/* Filter */
+.payment-filter {
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.payment-filter .label {
+  margin-bottom: 0;
+}
+
+/* Payments Table */
+.payments-table-container {
+  overflow-x: auto;
+}
+
+.payments-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.payments-table th {
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.payments-table td {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.payments-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.payments-table tbody tr:hover {
+  background-color: var(--blue-50);
+}
+
+.student-cell strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.amount-cell {
+  font-weight: 700;
+  color: var(--success);
+  font-size: 1rem;
+}
+
+.badge-method {
+  background-color: var(--blue-100);
+  color: var(--primary-blue);
+  font-size: 0.75rem;
+}
+
+.date-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.date-cell svg {
+  color: var(--primary-blue);
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.table-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.payments-empty {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .payments-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .payment-filter {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .payment-filter .input {
+    max-width: 100% !important;
+  }
+
+  .payments-table-container {
+    overflow-x: auto;
+  }
+
+  .payments-table {
+    min-width: 600px;
+  }
+
+  .summary-card {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
