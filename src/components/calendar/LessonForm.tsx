@@ -74,18 +74,16 @@ export default function LessonForm({
           {/* Duration Selection */}
           <div className="form-group">
             <label className="label" htmlFor="duration">Duration (minutes) *</label>
-            <select
+            <input
               id="duration"
               className="input"
               value={formData.duration}
               onChange={(e) => onChange({ duration: e.target.value })}
               required
-            >
-              <option value="30">30 minutes</option>
-              <option value="45">45 minutes</option>
-              <option value="60">60 minutes</option>
-              <option value="90">90 minutes</option>
-            </select>
+              type="number"
+              min="30"
+            />
+        
           </div>
         </div>
 

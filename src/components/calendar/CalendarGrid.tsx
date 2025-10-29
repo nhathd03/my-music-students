@@ -57,7 +57,7 @@ export default function CalendarGrid({
             key={index}
             className={`calendar-day ${!isCurrentMonth ? 'other-month' : ''} ${
               isToday ? 'today' : ''
-            }`}
+            } ${isCurrentMonth && dayLessons.length === 0 ? 'empty-day' : ''}`}
             onClick={() => isCurrentMonth && onDateClick(day)}
           >
             <div className="day-number">{format(day, 'd')}</div>
@@ -73,6 +73,10 @@ export default function CalendarGrid({
                   />
                 ))}
               </div>
+            )}
+            {/* Visual hint for empty days */}
+            {isCurrentMonth && dayLessons.length === 0 && (
+              <div className="empty-day-hint">+ Add lesson</div>
             )}
           </div>
         );

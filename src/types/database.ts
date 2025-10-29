@@ -35,6 +35,7 @@ export interface Lesson {
   duration: number;
   paid: boolean;
   student_id: number;
+  recurrence_rule: string | null;
   created_at: string;
 }
 
@@ -44,5 +45,15 @@ export interface Payment {
   amount: number;
   method: string | null;
   student_id: number;
+}
+
+
+export interface LessonOverride {
+  id: number;
+  lesson_id: string;
+  original_date: string;
+  new_date: string | null;
+  new_duration: number | null;
+  created_at: string;
 }
 

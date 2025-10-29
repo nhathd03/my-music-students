@@ -1,4 +1,3 @@
-import { Plus } from 'lucide-react';
 import { useCalendar } from './hooks/useCalendar';
 import LessonForm from './LessonForm';
 import CalendarNavigation from './CalendarNavigation';
@@ -12,10 +11,15 @@ import '../Calendar.css';
  * functionality. It delegates specific responsibilities to smaller,
  * focused sub-components:
  * 
- * - LessonForm: Handles adding/editing lesson records
+ * - LessonForm: Handles adding/editing lesson records (displayed in a modal)
  * - CalendarNavigation: Month navigation controls
  * - CalendarGrid: Displays the calendar with lessons
  * - LessonPill: Individual lesson display (used by CalendarGrid)
+ * 
+ * User Interaction:
+ * - Users click on any empty calendar day to open the lesson form
+ * - The form appears as a modal overlay with the selected date pre-filled
+ * - Clicking outside the modal or the cancel button closes the form
  * 
  * Business logic is managed by the useCalendar custom hook,
  * keeping this component focused on composition and layout.
@@ -39,7 +43,6 @@ export default function Calendar() {
     resetForm,
     handleDateClick,
     updateFormData,
-    setShowForm,
     goToPreviousMonth,
     goToNextMonth,
   } = useCalendar();
@@ -55,24 +58,24 @@ export default function Calendar() {
       <div className="calendar-header">
         <div>
           <h2>Lesson Calendar</h2>
-          <p className="calendar-subtitle">Schedule and manage piano lessons</p>
+          <p className="calendar-subtitle">Click on any day to schedule a lesson</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          <Plus size={18} />
-          Add Lesson
-        </button>
       </div>
 
-      {/* Form Section - Add/Edit lessons */}
+      {/* Modal Form - Appears when clicking on a calendar day */}
       {showForm && (
-        <LessonForm
-          students={students}
-          formData={formData}
-          editingLesson={editingLesson}
-          onSubmit={handleSubmit}
-          onCancel={resetForm}
-          onChange={updateFormData}
-        />
+        <div className="modal-overlay" onClick={resetForm}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <LessonForm
+              students={students}
+              formData={formData}
+              editingLesson={editingLesson}
+              onSubmit={handleSubmit}
+              onCancel={resetForm}
+              onChange={updateFormData}
+            />
+          </div>
+        </div>
       )}
 
       {/* Calendar Section */}

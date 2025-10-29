@@ -26,9 +26,44 @@
   color: var(--text-secondary);
 }
 
+/* Modal Overlay & Content */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+  backdrop-filter: blur(2px);
+}
+
+.modal-content {
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* Lesson Form */
 .lesson-form {
-  margin-bottom: 2rem;
+  margin-bottom: 0; /* Remove margin when in modal */
 }
 
 .lesson-form h3 {
@@ -101,6 +136,28 @@
 
 .calendar-day.today:hover {
   background-color: var(--blue-200);
+}
+
+/* Empty day hint - shows on hover */
+.calendar-day.empty-day {
+  position: relative;
+}
+
+.empty-day-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.calendar-day.empty-day:hover .empty-day-hint {
+  opacity: 1;
 }
 
 .day-number {

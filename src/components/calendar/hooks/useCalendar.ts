@@ -3,7 +3,7 @@ import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns
 import { supabase } from '../../../lib/supabase';
 import type { Lesson, Student } from '../../../types/database';
 import type { LessonWithStudent, LessonFormData } from '../types';
-
+import { RRule, rrulestr } from 'rrule';
 /**
  * Custom Hook: useCalendar
  * 
@@ -71,13 +71,25 @@ export function useCalendar() {
 
       if (lessonsError) throw lessonsError;
 
-      // Transform the data to flatten student object
-      const transformedLessons = (lessonsData as any)?.map((lesson: any) => ({
-        ...lesson,
-        student: Array.isArray(lesson.student) ? lesson.student[0] : lesson.student
-      })) as LessonWithStudent[] || [];
+      for (const lesson of lessonsData) {
+        
+        if (lesson.recurrence_rule) {
+          const rrule = rrulestr(lesson.recurrence_rule);
+          const occurrences = rrule.between(monthStart, monthEnd, true);
+          for (const occurrence of occurrences) {
+            lessonsData.push({
+              ...lesson,
+              date: occurrence.toISOString(),
+            });
+          }
+        }
+        else {
+          console.log(lesson);
 
-      setLessons(transformedLessons);
+        }
+      }
+
+      setLessons(lessonsData);
     } catch (error) {
       console.error('Error fetching data:', error);
       alert('Failed to load calendar data');
