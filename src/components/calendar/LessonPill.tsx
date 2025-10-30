@@ -3,6 +3,16 @@ import { Edit2, Trash2, CheckCircle } from 'lucide-react';
 import type { LessonPillProps } from './types';
 
 /**
+ * Converts a UTC date string from the database to a local Date object
+ */
+function parseUTCDate(dateString: string): Date {
+  if (dateString.includes('Z') || dateString.includes('+') || dateString.includes('-', 10)) {
+    return new Date(dateString);
+  }
+  return new Date(dateString + 'Z');
+}
+
+/**
  * LessonPill Component
  * 
  * Displays an individual lesson as a "pill" in the calendar day.
@@ -26,7 +36,7 @@ export default function LessonPill({
     >
       <div className="lesson-pill-content">
         <span className="lesson-time">
-          {format(new Date(lesson.date), 'h:mm a')}
+          {format(parseUTCDate(lesson.date), 'h:mm a')}
         </span>
         <span className="lesson-student">{lesson.student?.name}</span>
       </div>
@@ -47,7 +57,7 @@ export default function LessonPill({
         </button>
         <button
           className="lesson-action-btn lesson-delete-btn"
-          onClick={() => onDelete(lesson.id)}
+          onClick={() => onDelete(lesson)}
           title="Delete lesson"
         >
           <Trash2 size={14} />

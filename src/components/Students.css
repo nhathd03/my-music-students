@@ -53,6 +53,26 @@
   gap: 0.75rem;
 }
 
+.recurring-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 2rem;
+}
+
+.is-recurring {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.is-recurring label {
+  margin-bottom: 0;
+}
+
+
+
 /* Students Grid */
 .students-grid {
   display: grid;

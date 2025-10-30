@@ -1,5 +1,6 @@
 import { useCalendar } from './hooks/useCalendar';
-import LessonForm from './LessonForm';
+import LessonModal from './LessonModal';
+import RecurringEditModal from './RecurringEditModal';
 import CalendarNavigation from './CalendarNavigation';
 import CalendarGrid from './CalendarGrid';
 import '../Calendar.css';
@@ -21,8 +22,7 @@ import '../Calendar.css';
  * - The form appears as a modal overlay with the selected date pre-filled
  * - Clicking outside the modal or the cancel button closes the form
  * 
- * Business logic is managed by the useCalendar custom hook,
- * keeping this component focused on composition and layout.
+
  */
 export default function Calendar() {
   const {
@@ -34,7 +34,23 @@ export default function Calendar() {
     showForm,
     editingLesson,
     formData,
-
+    isRecurring,
+    setIsRecurring,
+    showRecurringEditModal,
+    recurringAction,
+    resetRecurringState,
+    setRecurringEditScope,
+    // RRule options
+    frequency,
+    setFrequency,
+    interval,
+    setInterval,
+    endType,
+    setEndType,
+    untilDate,
+    setUntilDate,
+    occurrenceCount,
+    setOccurrenceCount,
     // Actions
     handleSubmit,
     handleEdit,
@@ -66,16 +82,37 @@ export default function Calendar() {
       {showForm && (
         <div className="modal-overlay" onClick={resetForm}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <LessonForm
+            <LessonModal
               students={students}
               formData={formData}
               editingLesson={editingLesson}
+              isRecurring={isRecurring}
+              setIsRecurring={setIsRecurring}
+              frequency={frequency}
+              setFrequency={setFrequency}
+              interval={interval}
+              setInterval={setInterval}
+              endType={endType}
+              setEndType={setEndType}
+              untilDate={untilDate}
+              setUntilDate={setUntilDate}
+              occurrenceCount={occurrenceCount}
+              setOccurrenceCount={setOccurrenceCount}
               onSubmit={handleSubmit}
               onCancel={resetForm}
               onChange={updateFormData}
             />
           </div>
         </div>
+      )}
+
+      {/* Recurring Edit Modal - Appears when performing actions on recurring events */}
+      {showRecurringEditModal && (
+        <RecurringEditModal
+          action={recurringAction}
+          setRecurringEditScope={setRecurringEditScope}
+          onCancel={resetRecurringState}
+        />
       )}
 
       {/* Calendar Section */}

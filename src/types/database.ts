@@ -54,6 +54,8 @@ export interface LessonOverride {
   original_date: string;
   new_date: string | null;
   new_duration: number | null;
+  paid: boolean;
+  cancelled: boolean;
   created_at: string;
 }
 

@@ -3,6 +3,16 @@ import LessonPill from './LessonPill';
 import type { CalendarGridProps } from './types';
 
 /**
+ * Converts a UTC date string from the database to a local Date object
+ */
+function parseUTCDate(dateString: string): Date {
+  if (dateString.includes('Z') || dateString.includes('+') || dateString.includes('-', 10)) {
+    return new Date(dateString);
+  }
+  return new Date(dateString + 'Z');
+}
+
+/**
  * CalendarGrid Component
  * 
  * Renders the calendar grid with:
@@ -32,9 +42,10 @@ export default function CalendarGrid({
 
   /**
    * Get all lessons for a specific date
+   * Converts UTC dates from database to local time for comparison
    */
   const getLessonsForDate = (date: Date) => {
-    return lessons.filter(lesson => isSameDay(new Date(lesson.date), date));
+    return lessons.filter(lesson => isSameDay(parseUTCDate(lesson.date), date));
   };
 
   return (
@@ -65,7 +76,7 @@ export default function CalendarGrid({
               <div className="day-lessons">
                 {dayLessons.map((lesson) => (
                   <LessonPill
-                    key={lesson.id}
+                    key={`${lesson.id}-${lesson.date}`}
                     lesson={lesson}
                     onEdit={onEditLesson}
                     onDelete={onDeleteLesson}

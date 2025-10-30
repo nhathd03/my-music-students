@@ -308,3 +308,249 @@
   }
 }
 
+/* Recurring Event Form Styles */
+.recurring-section {
+  margin: 1.5rem 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.recurring-header {
+  margin-bottom: 1rem;
+}
+
+.recurring-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+.recurring-checkbox {
+  width: 1.125rem;
+  height: 1.125rem;
+  cursor: pointer;
+  accent-color: var(--primary-blue);
+}
+
+.recurring-options {
+  margin-top: 1.25rem;
+  padding: 1.25rem;
+  background-color: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* Recurrence Pattern (Interval + Frequency) */
+.recurrence-pattern .label {
+  margin-bottom: 0.5rem;
+}
+
+.pattern-inputs {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.interval-input {
+  width: 80px;
+  text-align: center;
+}
+
+.frequency-select {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Week Days Selection */
+.week-days-section .label {
+  margin-bottom: 0.5rem;
+}
+
+.week-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+}
+
+.day-button {
+  padding: 0.5rem;
+  background-color: var(--background);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.day-button:hover {
+  background-color: var(--blue-50);
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
+}
+
+.day-button.active {
+  background-color: var(--primary-blue);
+  color: white;
+  border-color: var(--primary-blue);
+}
+
+/* End Condition */
+.end-condition-section .label {
+  margin-bottom: 0.5rem;
+}
+
+.end-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.end-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+.end-option input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  accent-color: var(--primary-blue);
+}
+
+.end-option .date-input,
+.end-option .count-input {
+  margin: 0 0.5rem;
+  max-width: 150px;
+}
+
+.end-option input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Responsive for Recurring Form */
+@media (max-width: 768px) {
+  .week-days-grid {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.375rem;
+  }
+
+  .day-button {
+    padding: 0.375rem;
+    font-size: 0.7rem;
+  }
+
+  .pattern-inputs {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .interval-input,
+  .frequency-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .end-option {
+    flex-wrap: wrap;
+  }
+
+  .end-option .date-input,
+  .end-option .count-input {
+    width: 100%;
+    max-width: none;
+    margin: 0.5rem 0 0 1.5rem;
+  }
+}
+
+/* Paid Checkbox */
+.paid-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
+.paid-checkbox {
+  width: 1.125rem;
+  height: 1.125rem;
+  cursor: pointer;
+  accent-color: var(--success);
+}
+
+/* Recurring Edit Modal */
+.recurring-edit-modal {
+  max-width: 500px;
+}
+
+.recurring-edit-description {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.recurring-edit-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.recurring-edit-btn {
+  width: 100%;
+  padding: 1rem;
+  text-align: left;
+  display: flex;
+  align-items: flex-start;
+  transition: all 0.2s ease;
+  border: 2px solid var(--border);
+}
+
+.recurring-edit-btn:hover {
+  border-color: var(--primary-blue);
+  background-color: var(--blue-50);
+  transform: none;
+}
+
+.recurring-edit-btn-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.recurring-edit-btn-title {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.recurring-edit-btn-subtitle {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.recurring-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Responsive for Recurring Edit Modal */
+@media (max-width: 768px) {
+  .recurring-edit-modal {
+    max-width: 100%;
+  }
+}
+

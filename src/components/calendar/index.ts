@@ -19,7 +19,7 @@
  */
 
 export { default } from './Calendar';
-export { default as LessonForm } from './LessonForm';
+export { default as LessonForm } from './LessonModal';
 export { default as CalendarNavigation } from './CalendarNavigation';
 export { default as CalendarGrid } from './CalendarGrid';
 export { default as LessonPill } from './LessonPill';

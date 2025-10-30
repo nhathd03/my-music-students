@@ -18,7 +18,7 @@ function App() {
           <div className="header-content">
             <div className="logo">
               <Music size={32} />
-              <h1>Piano Studio Manager</h1>
+              <h1>My Music Students</h1>
             </div>
           </div>
         </div>
