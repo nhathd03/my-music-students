@@ -36,6 +36,7 @@ export interface Lesson {
   paid: boolean;
   student_id: number;
   recurrence_rule: string | null;
+  note: string | null;
   created_at: string;
 }
 
@@ -56,6 +57,7 @@ export interface LessonOverride {
   new_duration: number | null;
   paid: boolean;
   cancelled: boolean;
+  note: string | null;
   created_at: string;
 }
 

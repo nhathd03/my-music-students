@@ -105,21 +105,19 @@ export function useCalendar() {
    * Trigger action when recurring edit scope is selected
    */
   useEffect(() => {
-    if (recurringEditScope && recurringAction) {
+    if (!recurringEditScope || !recurringAction) return;
+  
+    const run = async () => {
       switch (recurringAction) {
-        case 'edit':
-          performSubmit();
-          break;
-        case 'delete':
-          performDelete();
-          break;
-        case 'togglePaid':
-          performTogglePaid();
-          break;
+        case 'edit': await performSubmit(); break;
+        case 'delete': await performDelete(); break;
       }
-      // Reset after action
+  
+      setRecurringEditScope(null);
       setRecurringAction(null);
-    }
+    };
+  
+    run();
   }, [recurringEditScope, recurringAction]);
   /**
    * Generate RRULE string from recurrence options
@@ -177,20 +175,24 @@ export function useCalendar() {
   const fetchData = async () => {
     try {
       setLoading(true);
-
-      // Fetch students
+  
+      /**   
+      * Fetch Students
+      */
       const { data: studentsData, error: studentsError } = await supabase
         .from('student')
         .select('*')
         .order('name');
-
+  
       if (studentsError) throw studentsError;
       setStudents(studentsData || []);
-
-      // Fetch lessons for current month
+  
+      /**   
+      * Fetch Lessons (Base)
+      */
       const monthStart = startOfMonth(currentDate);
       const monthEnd = endOfMonth(currentDate);
-
+  
       const { data: lessonsData, error: lessonsError } = await supabase
         .from('lesson')
         .select(`
@@ -201,34 +203,122 @@ export function useCalendar() {
           `recurrence_rule.not.is.null,and(date.gte.${monthStart.toISOString()},date.lte.${monthEnd.toISOString()})`
         )
         .order('date');
-
+  
       if (lessonsError) throw lessonsError;
-
-      const lessonsDataWithOccurrences = [];
-
-      // Get occurrences of recurring lessons
-      for (const lesson of lessonsData) {
+  
+      /**   
+      * Fetch Overrides
+      */
+      const { data: overrideLessonsData, error: overrideLessonsError } = await supabase
+        .from('lesson_override')
+        .select(`
+          *,
+          lesson:lesson_id (
+            *,
+            student:student_id (*)
+          )
+        `)
+        .or(
+          `new_date.gte.${monthStart.toISOString()},new_date.lte.${monthEnd.toISOString()}`
+        )
+        .order('new_date');
+  
+      if (overrideLessonsError) throw overrideLessonsError;
+      /** 
+      * Build a quick lookup of overrides
+      * Key format: "<lesson_id>|<original_date_ISO>"
+      */
+      const overrideMap = new Map<string, any>();
+   
+      for (const override of overrideLessonsData || []) {
+        // Ensure original_date is parsed correctly and stored as full ISO string
+        const originalDate = new Date(override.original_date);
+        const key = `${override.lesson_id}|${originalDate.toISOString()}`;
+        overrideMap.set(key, override);
+      }
+  
+      const lessonsDataWithOccurrences: LessonWithStudent[] = [];
+  
+      /** 
+      * Expand recurring lessons and apply overrides
+      */
+      for (const lesson of lessonsData || []) {
         if (lesson.recurrence_rule) {
-
-          
           const rrule = rrulestr(lesson.recurrence_rule);
           const occurrences = rrule.between(monthStart, monthEnd, true);
-          
+  
           for (const occurrence of occurrences) {
+            // Generate key using full ISO string for consistency
+            const occurrenceDateKey = `${lesson.id}|${occurrence.toISOString()}`;
+            const override = overrideMap.get(occurrenceDateKey);
+      
+            if (override) {
+              // Skip if this occurrence was deleted (new_date is null)
+              if (override.new_date === null) continue;
+
+              // Apply override (e.g., date changed, paid changed, note added)
+              // Ensure new_date is always in ISO format
+              const overrideDate = new Date(override.new_date).toISOString();
+              lessonsDataWithOccurrences.push({
+                ...lesson,
+                date: overrideDate,
+                duration: override.duration ?? lesson.duration,
+                paid: override.paid ?? lesson.paid,
+                note: override.note ?? lesson.note,
+                created_at: override.created_at,
+                student: Array.isArray(override.lesson.student)
+                  ? override.lesson.student[0]
+                  : override.lesson.student,
+              });
+            } else {
+              // No override - use the occurrence date as ISO string
+              lessonsDataWithOccurrences.push({
+                ...lesson,
+                date: occurrence.toISOString(),
+              });
+            }
+          }
+        } else {
+          // Non-recurring lesson - use full ISO string for key lookup
+          const lessonDate = new Date(lesson.date);
+          const lessonDateKey = `${lesson.id}|${lessonDate.toISOString()}`;
+          const override = overrideMap.get(lessonDateKey);
+
+          if (override) {
+            // Skip if this lesson was deleted
+            if (override.new_date === null) continue;
+
+            // Replace non-recurring lesson with override
+            // Ensure date is always in ISO format
+            const overrideDate = new Date(override.new_date).toISOString();
             lessonsDataWithOccurrences.push({
               ...lesson,
-              date: occurrence.toISOString(),
+              date: overrideDate,
+              duration: override.duration ?? lesson.duration,
+              paid: override.paid ?? lesson.paid,
+              note: override.note ?? lesson.note,
+              created_at: override.created_at,
+              student: Array.isArray(override.lesson.student)
+                ? override.lesson.student[0]
+                : override.lesson.student,
+            });
+          } else {
+            // No override - ensure date is in ISO format
+            lessonsDataWithOccurrences.push({
+              ...lesson,
+              date: lessonDate.toISOString(),
             });
           }
         }
-
-        else {
-          lessonsDataWithOccurrences.push(lesson);
-        }
       }
-
-      // Dates are kept in UTC format from database
-      // Conversion to local time happens in display components
+  
+      /** 
+      * Sort and assign final list
+      */
+      lessonsDataWithOccurrences.sort(
+        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      console.log('Lessons data with occurrences:', lessonsDataWithOccurrences);
       setLessons(lessonsDataWithOccurrences);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -237,6 +327,7 @@ export function useCalendar() {
       setLoading(false);
     }
   };
+  
 
   /**
    * Handles form submission for creating/updating lessons
@@ -385,8 +476,32 @@ export function useCalendar() {
 
     try {
       if (recurringEditScope === 'single') {
-        // TODO: Implement single occurrence deletion with lesson_override table
-        alert('Deleting single occurrence: This feature requires implementing the lesson_override table.');
+        try {
+          const lessonDate = parseUTCDate(editingLesson.date);
+  
+            const overrideLessonData = {
+              lesson_id: editingLesson.id,
+              original_date: lessonDate.toISOString(),
+              new_date: null,
+              paid: editingLesson.paid,
+              duration: editingLesson.duration,
+              note: editingLesson.note,
+            };
+        
+            const { error } = await supabase
+              .from('lesson_override')
+              .upsert(overrideLessonData, {
+                onConflict: 'lesson_id,original_date',
+                ignoreDuplicates: false,
+              });
+        
+            if (error) throw error;
+    
+          } catch (error) {
+            console.error('Error deleting lesson:', error);
+            alert('Failed to delete lesson');
+          }
+          
       } else if (recurringEditScope === 'future') {
         // TODO: Implement series deletion for future occurrences
         alert('Deleting future occurrences: This feature requires updating the UNTIL date in the recurrence rule.');
@@ -406,61 +521,62 @@ export function useCalendar() {
    * For recurring lessons, shows modal to choose update scope
    */
   const togglePaid = async (lesson: Lesson) => {
-    // For recurring lessons, show scope selection modal
-    if (lesson.recurrence_rule) {
-      setEditingLesson(lesson);
-      setRecurringAction('togglePaid');
-      setShowRecurringEditModal(true);
-      return;
-    }
-
-    // Simple toggle for non-recurring lessons
     try {
-      const { error } = await supabase
-        .from('lesson')
-        .update({ paid: !lesson.paid })
-        .eq('id', lesson.id);
+      const lessonDate = parseUTCDate(lesson.date);
+  
+      // If recurring → upsert override
+      if (lesson.recurrence_rule) {
+          const { data: existing } = await supabase
+          .from('lesson_override')
+          .select('paid')
+          .eq('lesson_id', lesson.id)
+          .eq('original_date', lessonDate.toISOString())
+          .maybeSingle();
+    
+        const newPaid = existing ? !existing.paid : !lesson.paid;
+        console.log('Existing paid:', existing);
+        const overrideLessonData = {
+          lesson_id: lesson.id,
+          original_date: lessonDate.toISOString(),
+          new_date: lessonDate.toISOString(),
+          paid: newPaid,
+          duration: lesson.duration,
+          note: lesson.note,
+        };
+    
+        const { error } = await supabase
+          .from('lesson_override')
+          .upsert(overrideLessonData, {
+            onConflict: 'lesson_id,original_date',
+            ignoreDuplicates: false,
+          });
+    
+        if (error) throw error;
 
-      if (error) throw error;
-      fetchData();
-    } catch (error) {
-      console.error('Error updating lesson:', error);
-      alert('Failed to update lesson');
-    }
-  };
-
-  /**
-   * Performs the actual paid toggle after scope is determined for recurring lessons
-   */
-  const performTogglePaid = async () => {
-    if (!editingLesson) return;
-
-    try {
-      if (recurringEditScope === 'single') {
-        // TODO: Implement single occurrence paid toggle with lesson_override table
-        alert('Toggling paid for single occurrence: This feature requires implementing the lesson_override table.');
-      } else if (recurringEditScope === 'future') {
-        // TODO: Implement paid toggle for future occurrences
-        alert('Toggling paid for future occurrences: This feature requires splitting the series or using overrides.');
+      } 
+      // Otherwise → update base lesson (single event)
+      else {
+        const { error } = await supabase
+          .from('lesson')
+          .update({ paid: !lesson.paid })
+          .eq('id', lesson.id);
+  
+        if (error) throw error;
       }
-
+  
       fetchData();
-      resetRecurringState();
     } catch (error) {
-      console.error('Error updating lesson:', error);
+      console.error('Error toggling paid:', error);
       alert('Failed to update lesson');
-      resetRecurringState();
     }
   };
+  
 
   /**
    * Resets recurring-related state after an action
    */
   const resetRecurringState = () => {
-    setRecurringEditScope(null);
-    setRecurringAction(null);
     setShowRecurringEditModal(false);
-    setEditingLesson(null);
     setIsRecurring(false);
     setShowForm(false);
   };
