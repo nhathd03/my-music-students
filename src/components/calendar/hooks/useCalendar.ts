@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+ import { useState, useEffect } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
 import type { Lesson, Student } from '../../../types/database';
 import type { LessonWithStudent, LessonFormData } from '../types';
@@ -268,10 +268,31 @@ export function useCalendar() {
   /**
    * Deletes a lesson after confirmation
    * For recurring lessons, shows modal to choose delete scope
+   * Exception: If deleting the last occurrence, skips modal and treats as single deletion
    */
   const handleDelete = async (lesson: Lesson) => {
-    // For recurring lessons, show scope selection modal
+    // For recurring lessons, check if it's the last occurrence
     if (lesson.recurrence_rule) {
+      // Check if this is the last occurrence in the series
+      const isLast = await lessonService.isLastOccurrence(lesson);
+      
+      if (isLast) {
+        // If last occurrence, delete as single without showing modal
+        if (!confirm('Are you sure you want to delete this lesson?')) {
+          return;
+        }
+
+        try {
+          await lessonService.deleteSingleOccurrence(lesson);
+          fetchData();
+        } catch (error) {
+          console.error('Error deleting lesson:', error);
+          alert('Failed to delete lesson');
+        }
+        return;
+      }
+
+      // For non-last occurrences, show scope selection modal
       setEditingLesson(lesson);
       setRecurringAction('delete');
       setShowRecurringEditModal(true);
@@ -312,6 +333,7 @@ export function useCalendar() {
 
       fetchData();
       resetRecurringState();
+      resetForm();
     } catch (error) {
       console.error('Error deleting lesson:', error);
       alert('Failed to delete lesson');
