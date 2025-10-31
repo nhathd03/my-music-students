@@ -51,7 +51,7 @@ export interface Payment {
 
 export interface LessonOverride {
   id: number;
-  lesson_id: string;
+  lesson_id: number;
   original_date: string;
   new_date: string | null;
   new_duration: number | null;
