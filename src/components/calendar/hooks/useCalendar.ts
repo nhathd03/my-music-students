@@ -109,8 +109,7 @@ export function useCalendar() {
 
   /**
    * Update formData with generated RRULE whenever recurrence options change
-   * Note: formData.date and formData.time are used in generateRRule but not as triggers
-   * We only want to regenerate when recurrence options change, not when date/time changes
+   * Regenerates the RRULE when date/time are filled in or when any recurrence option changes
    */
   useEffect(() => {
     if (isRecurring && formData.date && formData.time) {
@@ -130,7 +129,7 @@ export function useCalendar() {
       updateFormData({ recurrence_rule: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRecurring, frequency, interval, endType, untilDate, occurrenceCount]);
+  }, [isRecurring, frequency, interval, endType, untilDate, occurrenceCount, formData.date, formData.time]);
 
   // ============================================================================
   // Recurring Action Handler
@@ -210,8 +209,8 @@ export function useCalendar() {
       }
 
       if (editingLesson && editingLesson.recurrence_rule && recurringEditScope === 'single') {
-        // TODO: Implement single occurrence editing with lesson_override table
-        alert('Editing single occurrence: This feature requires implementing the lesson_override table.');
+        // Edit single occurrence by creating an override
+        await lessonService.updateSingleOccurrence(editingLesson, editingLesson.date, lessonData);
       } else if (editingLesson && editingLesson.recurrence_rule && recurringEditScope === 'future') {
         // TODO: Implement series split for future occurrences
         alert('Editing future occurrences: This feature requires splitting the recurring series.');

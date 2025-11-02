@@ -48,6 +48,7 @@ export default function LessonModal({
               className="input"
               value={formData.student_id}
               onChange={(e) => onChange({ student_id: e.target.value })}
+              disabled={!!editingLesson}
               required
             >
               <option value="">Select a student</option>

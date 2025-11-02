@@ -223,45 +223,173 @@ export async function updateLesson(
 }
 
 /**
+ * Checks if an override is redundant (all fields match original lesson and not rescheduled)
+ */
+function isOverrideRedundant(override: any, lesson: Lesson, originalDate: string): boolean {
+  // Normalize dates to ISO strings for comparison
+  const overrideNewDate = new Date(override.new_date).toISOString();
+  const normalizedOriginalDate = new Date(originalDate).toISOString();
+  
+  const isRedundant = (
+    overrideNewDate === normalizedOriginalDate &&
+    override.paid === lesson.paid &&
+    override.duration === lesson.duration &&
+    (override.note === lesson.note || (override.note === null && lesson.note === null))
+  );
+
+  return isRedundant;
+}
+
+/**
  * Updates the paid status of a lesson (recurring or non-recurring)
  */
 export async function toggleLessonPaid(lesson: Lesson): Promise<void> {
-  const lessonDateISO = lesson.date;
-
   if (lesson.recurrence_rule) {
-    // Recurring lesson - use override
-    const { data: existing } = await supabase
+    const lessonDateISO = lesson.date;
+
+    // Fetch the original lesson from database (not the merged version with overrides)
+    const { data: originalLesson, error: fetchError } = await supabase
+      .from('lesson')
+      .select('*')
+      .eq('id', lesson.id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Check if an override already exists where new_date matches this occurrence
+    // This handles cases where the occurrence was rescheduled
+    const { data: existingByNewDate } = await supabase
       .from('lesson_override')
-      .select('paid')
+      .select('*')
+      .eq('lesson_id', lesson.id)
+      .eq('new_date', lessonDateISO)
+      .maybeSingle();
+
+    // Also check for override where original_date matches (non-rescheduled)
+    const { data: existingByOriginalDate } = await supabase
+      .from('lesson_override')
+      .select('*')
       .eq('lesson_id', lesson.id)
       .eq('original_date', lessonDateISO)
       .maybeSingle();
+
+    // Use whichever override exists (prioritize new_date match for rescheduled events)
+    const existing = existingByNewDate || existingByOriginalDate;
+    const originalDate = existing?.original_date || lessonDateISO;
 
     const newPaid = existing ? !existing.paid : !lesson.paid;
 
     const overrideLessonData = {
       lesson_id: lesson.id,
-      original_date: lessonDateISO,
-      new_date: lessonDateISO,
+      original_date: originalDate,
+      // Preserve existing override data if it exists
+      new_date: existing?.new_date || originalDate,
       paid: newPaid,
-      duration: lesson.duration,
-      note: lesson.note,
+      duration: existing?.duration || originalLesson.duration,
+      note: existing?.note || originalLesson.note,
     };
 
-    const { error } = await supabase
-      .from('lesson_override')
-      .upsert(overrideLessonData, {
-        onConflict: 'lesson_id,original_date',
-        ignoreDuplicates: false,
-      });
+    // Check if the override would be redundant after toggling paid
+    if (isOverrideRedundant(overrideLessonData, originalLesson, originalDate)) {
+      // Delete the redundant override
+      const { error } = await supabase
+        .from('lesson_override')
+        .delete()
+        .eq('lesson_id', lesson.id)
+        .eq('original_date', originalDate);
 
-    if (error) throw error;
+      if (error) throw error;
+    } else {
+      // Create or update the override
+      const { error } = await supabase
+        .from('lesson_override')
+        .upsert(overrideLessonData, {
+          onConflict: 'lesson_id,original_date',
+          ignoreDuplicates: false,
+        });
+
+      if (error) throw error;
+    }
   } else {
     // Non-recurring lesson - update directly
     const { error } = await supabase
       .from('lesson')
       .update({ paid: !lesson.paid })
       .eq('id', lesson.id);
+
+    if (error) throw error;
+  }
+}
+
+/**
+ * Updates a single occurrence of a recurring lesson by creating/updating an override
+ */
+export async function updateSingleOccurrence(
+  lesson: Lesson,
+  displayedDate: string,
+  updatedData: Partial<LessonInsertData>
+): Promise<void> {
+  // Fetch the original lesson from database (not the merged version with overrides)
+  const { data: originalLesson, error: fetchError } = await supabase
+    .from('lesson')
+    .select('*')
+    .eq('id', lesson.id)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  // Check if an override already exists where new_date matches the displayed date
+  // This handles cases where we're editing an already-overridden occurrence
+  const { data: existingByNewDate } = await supabase
+    .from('lesson_override')
+    .select('*')
+    .eq('lesson_id', lesson.id)
+    .eq('new_date', displayedDate)
+    .maybeSingle();
+
+  // Also check for override where original_date matches
+  const { data: existingByOriginalDate } = await supabase
+    .from('lesson_override')
+    .select('*')
+    .eq('lesson_id', lesson.id)
+    .eq('original_date', displayedDate)
+    .maybeSingle();
+
+  // Use whichever override exists (prioritize new_date match)
+  const existing = existingByNewDate || existingByOriginalDate;
+  
+  // Use the true original RRULE date (from existing override, or displayedDate if no override)
+  const trueOriginalDate = existing?.original_date || displayedDate;
+
+  // Create override with updated data
+  const overrideData = {
+    lesson_id: lesson.id,
+    original_date: trueOriginalDate,
+    new_date: updatedData.date || trueOriginalDate,
+    paid: updatedData.paid ?? originalLesson.paid,
+    duration: updatedData.duration ?? originalLesson.duration,
+    note: originalLesson.note,
+  };
+
+  // Check if the override would be redundant (matches original lesson)
+  if (isOverrideRedundant(overrideData, originalLesson, trueOriginalDate)) {
+    // Delete the redundant override if it exists
+    const { error } = await supabase
+      .from('lesson_override')
+      .delete()
+      .eq('lesson_id', lesson.id)
+      .eq('original_date', trueOriginalDate);
+
+    if (error) throw error;
+    console.log(`Deleted redundant override for lesson ${lesson.id} at ${trueOriginalDate}`);
+  } else {
+    // Create or update the override
+    const { error } = await supabase
+      .from('lesson_override')
+      .upsert(overrideData, {
+        onConflict: 'lesson_id,original_date',
+        ignoreDuplicates: false,
+      });
 
     if (error) throw error;
   }
@@ -383,31 +511,29 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
   );
   const isLastOccurrence = deletingIndex === visibleOccurrences.length - 1;
 
-  // Edge case: If deleting the last occurrence, truncate the RRULE instead of creating override
-  if (isLastOccurrence && visibleOccurrences.length > 1) {
-    const lessonDate = new Date(lesson.date);
-    const untilDate = new Date(lessonDate);
-    untilDate.setDate(untilDate.getDate() - 1);
-    untilDate.setHours(23, 59, 59, 999);
+  // If only 1 occurrence remains, delete the lesson entirely
+  if (visibleOccurrences.length === 1) {
+    // Delete all overrides first (foreign key constraint)
+    const { error: deleteOverridesError } = await supabase
+      .from('lesson_override')
+      .delete()
+      .eq('lesson_id', lesson.id);
 
-    const oldRule = rrulestr(originalLesson.recurrence_rule);
-    const updatedRule = new RRule({
-      ...oldRule.options,
-      until: untilDate,
-    });
+    if (deleteOverridesError) throw deleteOverridesError;
 
-    const { error: updateError } = await supabase
+    // Delete the lesson
+    const { error: deleteLessonError } = await supabase
       .from('lesson')
-      .update({ recurrence_rule: updatedRule.toString() })
+      .delete()
       .eq('id', lesson.id);
 
-    if (updateError) throw updateError;
+    if (deleteLessonError) throw deleteLessonError;
 
-    console.log(`Truncated recurrence to exclude last occurrence.`);
+    console.log(`Deleted lesson ${lesson.id} entirely - was the last remaining occurrence.`);
     return;
   }
 
-  // Edge case: If only 2 visible occurrences remain, convert to non-recurring
+  // If only 2 visible occurrences remain, convert to non-recurring
   if (visibleOccurrences.length === 2) {
     const isFirstOccurrence = visibleOccurrences[0].toISOString() === deletingOccurrenceISO;
 
@@ -439,6 +565,65 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
       console.log(`Converted lesson ${lesson.id} to non-recurring - only 2 occurrences existed.`);
       return;
     }
+  }
+
+  // If deleting the last occurrence (and more than 2 remain), truncate the RRULE
+  if (isLastOccurrence && visibleOccurrences.length > 2) {
+    const lessonDate = new Date(lesson.date);
+    const untilDate = new Date(lessonDate);
+    untilDate.setDate(untilDate.getDate() - 1);
+    untilDate.setHours(23, 59, 59, 999);
+
+    // Check how many occurrences will remain after truncation
+    const oldRule = rrulestr(originalLesson.recurrence_rule);
+    const updatedRule = new RRule({
+      ...oldRule.options,
+      until: untilDate,
+    });
+
+    const startDate = new Date(originalLesson.date);
+    const remainingAfterTruncate = updatedRule.between(startDate, untilDate, true);
+
+    // Filter out already deleted occurrences
+    const visibleAfterTruncate = remainingAfterTruncate.filter(
+      occurrence => !deletedDates.has(occurrence.toISOString())
+    );
+
+    // If only 1 occurrence remains after truncation, convert to non-recurring
+    if (visibleAfterTruncate.length === 1) {
+      // Delete all overrides (no longer needed)
+      const { error: deleteOverridesError } = await supabase
+        .from('lesson_override')
+        .delete()
+        .eq('lesson_id', lesson.id);
+
+      if (deleteOverridesError) throw deleteOverridesError;
+
+      // Convert to non-recurring lesson with the remaining occurrence's date
+      const { error: updateError } = await supabase
+        .from('lesson')
+        .update({ 
+          recurrence_rule: null,
+          date: visibleAfterTruncate[0].toISOString()
+        })
+        .eq('id', lesson.id);
+
+      if (updateError) throw updateError;
+
+      console.log(`Converted lesson ${lesson.id} to non-recurring after truncation - only 1 occurrence remains.`);
+      return;
+    }
+
+    // Otherwise, truncate normally
+    const { error: updateError } = await supabase
+      .from('lesson')
+      .update({ recurrence_rule: updatedRule.toString() })
+      .eq('id', lesson.id);
+
+    if (updateError) throw updateError;
+
+    console.log(`Truncated recurrence to exclude last occurrence.`);
+    return;
   }
 
   // Normal case: Create override to delete this single occurrence
@@ -566,10 +751,13 @@ export async function deleteFutureOccurrences(lesson: Lesson): Promise<void> {
 
     if (deleteOverridesError) throw deleteOverridesError;
 
-    // Convert to non-recurring by removing recurrence_rule
+    // Convert to non-recurring by removing recurrence_rule and updating date
     const { error: updateError } = await supabase
       .from('lesson')
-      .update({ recurrence_rule: null })
+      .update({ 
+        recurrence_rule: null,
+        date: visibleOccurrences[0].toISOString()
+      })
       .eq('id', lesson.id);
 
     if (updateError) throw updateError;
