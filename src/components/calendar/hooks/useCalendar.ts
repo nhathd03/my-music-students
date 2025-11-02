@@ -212,8 +212,8 @@ export function useCalendar() {
         // Edit single occurrence by creating an override
         await lessonService.updateSingleOccurrence(editingLesson, editingLesson.date, lessonData);
       } else if (editingLesson && editingLesson.recurrence_rule && recurringEditScope === 'future') {
-        // TODO: Implement series split for future occurrences
-        alert('Editing future occurrences: This feature requires splitting the recurring series.');
+        // Implement series split for future occurrences
+        await lessonService.updateCurrentAndFutureOccurrences(editingLesson, lessonData);
       } else if (editingLesson) {
         // Update existing non-recurring lesson
         await lessonService.updateLesson(editingLesson.id, lessonData);

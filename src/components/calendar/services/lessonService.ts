@@ -788,3 +788,200 @@ export async function deleteFutureOccurrences(lesson: Lesson): Promise<void> {
 
   console.log(`Truncated recurrence at ${untilDate.toISOString()} and cleaned overrides.`);
 }
+
+/**
+ * Updates the current and all future occurrences of a recurring lesson
+ * 
+ * This function:
+ * 1. Truncates the original lesson to end before this occurrence
+ * 2. Creates a new recurring lesson starting from this occurrence with updated data
+ * 3. Handles edge cases:
+ *    - If this is the first occurrence, updates the lesson directly instead of splitting
+ *    - If truncation results in 0 visible occurrences, deletes the old lesson
+ *    - If truncation results in 1 visible occurrence, converts the old lesson to non-recurring
+ */
+export async function updateCurrentAndFutureOccurrences(
+  lesson: Lesson,
+  updatedData: Partial<LessonInsertData>
+): Promise<void> {
+  const lessonDate = new Date(lesson.date);
+
+  // Fetch original lesson
+  const { data: originalLesson, error: fetchError } = await supabase
+    .from('lesson')
+    .select('*')
+    .eq('id', lesson.id)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  if (!originalLesson.recurrence_rule) {
+    throw new Error('Lesson is not recurring.');
+  }
+
+  // Parse the recurrence rule
+  const oldRule = rrulestr(originalLesson.recurrence_rule);
+  const startDate = new Date(originalLesson.date);
+
+  // Generate all occurrences to find if this is the first one
+  const endDate = oldRule.options.until 
+    ? new Date(oldRule.options.until)
+    : new Date(startDate.getTime() + 10 * 365 * 24 * 60 * 60 * 1000);
+  
+  const allOccurrences = oldRule.between(startDate, endDate, true);
+
+  // Fetch existing overrides to account for deleted occurrences
+  const { data: existingOverrides, error: overridesError } = await supabase
+    .from('lesson_override')
+    .select('original_date, new_date')
+    .eq('lesson_id', lesson.id);
+
+  if (overridesError) throw overridesError;
+
+  const deletedDates = new Set(
+    (existingOverrides || [])
+      .filter(o => o.new_date === null)
+      .map(o => new Date(o.original_date).toISOString())
+  );
+
+  const visibleOccurrences = allOccurrences.filter(
+    occurrence => !deletedDates.has(occurrence.toISOString())
+  );
+
+  const currentOccurrenceISO = lessonDate.toISOString();
+  const currentIndex = visibleOccurrences.findIndex(
+    occ => occ.toISOString() === currentOccurrenceISO
+  );
+
+  const isFirstOccurrence = currentIndex === 0;
+
+  // CASE 1: If this is the first occurrence, just update the lesson directly
+  if (isFirstOccurrence) {
+    const updatePayload: any = {};
+    
+    if (updatedData.date !== undefined) {
+      // If date changed, update the start date of the recurrence
+      updatePayload.date = updatedData.date;
+    }
+    if (updatedData.duration !== undefined) {
+      updatePayload.duration = updatedData.duration;
+    }
+    if (updatedData.paid !== undefined) {
+      updatePayload.paid = updatedData.paid;
+    }
+    if (updatedData.recurrence_rule !== undefined) {
+      updatePayload.recurrence_rule = updatedData.recurrence_rule;
+    }
+
+    const { error: updateError } = await supabase
+      .from('lesson')
+      .update(updatePayload)
+      .eq('id', lesson.id);
+
+    if (updateError) throw updateError;
+
+    // Delete all overrides since we're updating the base lesson
+    const { error: deleteOverridesError } = await supabase
+      .from('lesson_override')
+      .delete()
+      .eq('lesson_id', lesson.id);
+
+    if (deleteOverridesError) throw deleteOverridesError;
+
+    console.log(`Updated lesson ${lesson.id} directly - was first occurrence.`);
+    return;
+  }
+
+  // CASE 2: This is NOT the first occurrence, so we need to split the series
+  
+  // Step 1: Truncate the original lesson to end before this occurrence
+  const untilDate = new Date(lessonDate);
+  untilDate.setDate(untilDate.getDate() - 1);
+  untilDate.setHours(23, 59, 59, 999);
+
+  const truncatedRule = new RRule({
+    ...oldRule.options,
+    until: untilDate,
+  });
+
+  const remainingOccurrences = truncatedRule.between(startDate, untilDate, true);
+
+  // Check visible occurrences before this date
+  const visibleBeforeOccurrences = remainingOccurrences.filter(
+    occurrence => !deletedDates.has(occurrence.toISOString())
+  );
+
+  // Step 2: Create the new lesson with updated data starting from this occurrence
+  const newLessonData: LessonInsertData = {
+    student_id: originalLesson.student_id,
+    date: updatedData.date || currentOccurrenceISO,
+    duration: updatedData.duration ?? originalLesson.duration,
+    paid: updatedData.paid ?? originalLesson.paid,
+    recurrence_rule: updatedData.recurrence_rule ?? originalLesson.recurrence_rule,
+  };
+
+  const { error: createError } = await supabase
+    .from('lesson')
+    .insert([newLessonData]);
+
+  if (createError) throw createError;
+
+  // Step 3: Handle the old lesson based on remaining visible occurrences
+  if (visibleBeforeOccurrences.length === 0) {
+    // No visible occurrences remain in the old series - delete it entirely
+    const { error: deleteOverridesError } = await supabase
+      .from('lesson_override')
+      .delete()
+      .eq('lesson_id', lesson.id);
+
+    if (deleteOverridesError) throw deleteOverridesError;
+
+    const { error: deleteLessonError } = await supabase
+      .from('lesson')
+      .delete()
+      .eq('id', lesson.id);
+
+    if (deleteLessonError) throw deleteLessonError;
+
+    console.log(`Deleted old lesson ${lesson.id} - no visible occurrences remained before split.`);
+  } else if (visibleBeforeOccurrences.length === 1) {
+    // Only one occurrence remains - convert to non-recurring
+    const { error: deleteOverridesError } = await supabase
+      .from('lesson_override')
+      .delete()
+      .eq('lesson_id', lesson.id);
+
+    if (deleteOverridesError) throw deleteOverridesError;
+
+    const { error: updateError } = await supabase
+      .from('lesson')
+      .update({ 
+        recurrence_rule: null,
+        date: visibleBeforeOccurrences[0].toISOString()
+      })
+      .eq('id', lesson.id);
+
+    if (updateError) throw updateError;
+
+    console.log(`Converted old lesson ${lesson.id} to non-recurring - only 1 occurrence remained before split.`);
+  } else {
+    // Multiple occurrences remain - truncate the recurrence
+    const { error: updateError } = await supabase
+      .from('lesson')
+      .update({ recurrence_rule: truncatedRule.toString() })
+      .eq('id', lesson.id);
+
+    if (updateError) throw updateError;
+
+    // Delete orphaned overrides (at or after the current date)
+    const { error: deleteError } = await supabase
+      .from('lesson_override')
+      .delete()
+      .eq('lesson_id', lesson.id)
+      .gte('original_date', currentOccurrenceISO);
+
+    if (deleteError) throw deleteError;
+
+    console.log(`Truncated old lesson ${lesson.id} at ${untilDate.toISOString()} and created new series.`);
+  }
+}
