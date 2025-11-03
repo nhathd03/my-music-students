@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, addMinutes } from 'date-fns';
 import { Edit2, Trash2, CheckCircle } from 'lucide-react';
 import type { LessonPillProps } from './types';
 
@@ -13,12 +13,21 @@ function parseUTCDate(dateString: string): Date {
 }
 
 /**
+ * Formats a time range for a lesson
+ */
+function formatLessonTimeRange(startDate: Date, durationMinutes: number): string {
+  const endDate = addMinutes(startDate, durationMinutes);
+  const startTime = format(startDate, 'h:mm a');
+  const endTime = format(endDate, 'h:mm a');
+  return `${startTime} - ${endTime}`;
+}
+
+/**
  * LessonPill Component
  * 
  * Displays an individual lesson as a "pill" in the calendar day.
  * 
- * Features:
- * - Shows lesson time and student name
+ * - Shows lesson time range (start - end) and student name
  * - Color-coded by payment status (blue = unpaid, green = paid)
  * - Action buttons: mark as paid, edit, delete
  * - Hover effect to show actions
@@ -29,6 +38,9 @@ export default function LessonPill({
   onDelete,
   onTogglePaid,
 }: LessonPillProps) {
+  const startDate = parseUTCDate(lesson.date);
+  const timeRange = formatLessonTimeRange(startDate, lesson.duration);
+
   return (
     <div
       className={`lesson-pill ${lesson.paid ? 'lesson-paid' : ''}`}
@@ -36,7 +48,7 @@ export default function LessonPill({
     >
       <div className="lesson-pill-content">
         <span className="lesson-time">
-          {format(parseUTCDate(lesson.date), 'h:mm a')}
+          {timeRange}
         </span>
         <span className="lesson-student">{lesson.student?.name}</span>
       </div>

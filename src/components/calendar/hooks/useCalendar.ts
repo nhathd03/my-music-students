@@ -4,7 +4,7 @@ import type { Lesson, Student } from '../../../types/database';
 import type { LessonWithStudent, LessonFormData } from '../types';
 import { parseUTCDate } from '../utils/dateUtils';
 import { generateRRule, parseRRule } from '../utils/rruleUtils';
-import * as lessonService from '../services/lessonService';
+import * as lessonService from '../services/lesson';
 
 /**
  * Custom Hook: useCalendar
