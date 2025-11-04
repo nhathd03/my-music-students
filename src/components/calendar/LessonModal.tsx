@@ -33,6 +33,7 @@ export default function LessonModal({
   onSubmit,
   onCancel,
   onChange,
+  hasFormChanged,
 }: LessonModalProps) {
 
   return (
@@ -98,19 +99,6 @@ export default function LessonModal({
               type="number"
               min="30"
             />
-          </div>
-
-          {/* Paid Status */}
-          <div className="form-group">
-            <label className="label paid-label">
-              <input
-                type="checkbox"
-                checked={formData.paid}
-                onChange={(e) => onChange({ paid: e.target.checked })}
-                className="paid-checkbox"
-              />
-              <span>Paid</span>
-            </label>
           </div>
         </div>
 
@@ -222,9 +210,27 @@ export default function LessonModal({
           )}
         </div>
 
+        {/* Note Field */}
+        <div className="form-group lesson-note-field">
+          <label className="label" htmlFor="note">Note (Optional)</label>
+          <textarea
+            id="note"
+            className="input lesson-note-textarea"
+            value={formData.note || ''}
+            onChange={(e) => onChange({ note: e.target.value || null })}
+            placeholder="Add a note for this lesson..."
+            rows={3}
+          />
+        </div>
+
         {/* Form Actions */}
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary">
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={!!editingLesson && !hasFormChanged}
+            title={editingLesson && !hasFormChanged ? 'No changes to save' : ''}
+          >
             {editingLesson ? 'Update Lesson' : 'Schedule Lesson'}
           </button>
           <button type="button" className="btn btn-secondary" onClick={onCancel}>

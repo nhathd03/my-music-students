@@ -1,29 +1,12 @@
+import { useNavigate } from 'react-router-dom';
 import { useCalendar } from './hooks/useCalendar';
 import LessonModal from './LessonModal';
 import RecurringEditModal from './RecurringEditModal';
 import CalendarNavigation from './CalendarNavigation';
 import CalendarGrid from './CalendarGrid';
-import '../Calendar.css';
+import type { LessonWithStudent } from './types';
+import './styles/Calendar.css';
 
-/**
- * Calendar Component (Main Container)
- * 
- * This is the main container component that orchestrates all calendar-related
- * functionality. It delegates specific responsibilities to smaller,
- * focused sub-components:
- * 
- * - LessonForm: Handles adding/editing lesson records (displayed in a modal)
- * - CalendarNavigation: Month navigation controls
- * - CalendarGrid: Displays the calendar with lessons
- * - LessonPill: Individual lesson display (used by CalendarGrid)
- * 
- * User Interaction:
- * - Users click on any empty calendar day to open the lesson form
- * - The form appears as a modal overlay with the selected date pre-filled
- * - Clicking outside the modal or the cancel button closes the form
- * 
-
- */
 export default function Calendar() {
   const {
     // State
@@ -55,13 +38,29 @@ export default function Calendar() {
     handleSubmit,
     handleEdit,
     handleDelete,
-    togglePaid,
     resetForm,
     handleDateClick,
     updateFormData,
     goToPreviousMonth,
     goToNextMonth,
+
+    // Form validation
+    hasFormChanged,
   } = useCalendar();
+
+  const navigate = useNavigate();
+
+  const handlePayLesson = (lesson: LessonWithStudent) => {
+    navigate('/payments', {
+      state: {
+        lessonToPay: {
+          id: lesson.id,
+          date: lesson.date,
+          studentId: lesson.student_id,
+        }
+      }
+    });
+  };
 
   // Loading state
   if (loading) {
@@ -101,6 +100,7 @@ export default function Calendar() {
               onSubmit={handleSubmit}
               onCancel={resetForm}
               onChange={updateFormData}
+              hasFormChanged={hasFormChanged()}
             />
           </div>
         </div>
@@ -131,7 +131,7 @@ export default function Calendar() {
           onDateClick={handleDateClick}
           onEditLesson={handleEdit}
           onDeleteLesson={handleDelete}
-          onTogglePaid={togglePaid}
+          onPayLesson={handlePayLesson}
         />
       </div>
     </div>

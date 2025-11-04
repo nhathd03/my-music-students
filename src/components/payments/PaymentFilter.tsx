@@ -16,10 +16,9 @@ export default function PaymentFilter({
       <label className="label" htmlFor="filter-student">Filter by Student:</label>
       <select
         id="filter-student"
-        className="input"
+        className="input payment-filter-select"
         value={selectedStudent}
         onChange={(e) => onFilterChange(e.target.value)}
-        style={{ maxWidth: '300px' }}
       >
         <option value="all">All Students</option>
         {students.map((student) => (

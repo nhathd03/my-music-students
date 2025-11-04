@@ -111,7 +111,7 @@
   min-height: 140px;
   padding: 0.5rem;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.5s ease;
   display: flex;
   flex-direction: column;
 }
@@ -151,7 +151,7 @@
   color: var(--text-secondary);
   font-size: 0.75rem;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.5s ease;
   pointer-events: none;
   white-space: nowrap;
 }
@@ -187,7 +187,7 @@
   padding: 0.5rem;
   font-size: 0.75rem;
   position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.5s ease;
 }
 
 .lesson-pill:hover {
@@ -209,7 +209,7 @@
   gap: 0.125rem;
   width: 100%;
   padding-right: 0;
-  transition: padding-right 0.2s ease;
+  transition: padding-right 0.5s ease;
 }
 
 .lesson-time {
@@ -239,7 +239,7 @@
   padding: 0 0.25rem;
   background: linear-gradient(to left, var(--primary-blue) 60%, transparent);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.5s ease;
   pointer-events: none;
 }
 
@@ -264,7 +264,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.5s ease;
 }
 
 .lesson-action-btn:hover {
@@ -273,6 +273,46 @@
 
 .lesson-delete-btn:hover {
   background-color: var(--error);
+}
+
+.lesson-has-note {
+  position: relative;
+}
+
+.lesson-note-tooltip {
+  position: absolute;
+  bottom: calc(100% + 0.5rem);
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background-color: var(--surface);
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.7rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  width: 100%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.5s ease;
+  z-index: 1000;
+}
+
+.lesson-pill:hover .lesson-note-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+
+.lesson-note-field {
+  margin: 1.5rem 0;
+}
+
+.lesson-note-textarea {
+  resize: vertical;
+  min-height: 80px;
 }
 
 /* Responsive Design */
@@ -404,7 +444,7 @@
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.5s ease;
 }
 
 .day-button:hover {
@@ -532,7 +572,7 @@
   text-align: left;
   display: flex;
   align-items: flex-start;
-  transition: all 0.2s ease;
+  transition: all 0.5s ease;
   border: 2px solid var(--border);
 }
 

@@ -1,8 +1,8 @@
 import { startOfMonth, endOfMonth } from 'date-fns';
+import { rrulestr } from 'rrule';
 import { supabase } from '../../../../lib/supabase';
 import type { Student } from '../../../../types/database';
 import type { LessonWithStudent } from '../../types';
-import { buildOverrideMap, expandLessonsWithOverrides } from './helpers';
 
 /**
  * Lesson Service - Fetch Operations
@@ -23,7 +23,7 @@ export async function fetchStudents(): Promise<Student[]> {
 }
 
 /**
- * Fetches lessons for a given month, including recurring lessons and overrides
+ * Fetches lessons for a given month
  */
 export async function fetchLessonsForMonth(
   currentDate: Date
@@ -31,7 +31,7 @@ export async function fetchLessonsForMonth(
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
 
-  // Fetch base lessons (recurring + lessons in current month)
+  // Fetch all lessons with student data
   const { data: lessonsData, error: lessonsError } = await supabase
     .from('lesson')
     .select(`
@@ -45,40 +45,112 @@ export async function fetchLessonsForMonth(
 
   if (lessonsError) throw lessonsError;
 
-  // Fetch overrides for current month
-  const { data: overrideLessonsData, error: overrideLessonsError } = await supabase
-  .from('lesson_override')
-  .select(`
-    *,
-    lesson:lesson_id (
-      *,
-      student:student_id (*)
+  // Fetch all payment items to determine which lessons are paid
+  const lessonIds = (lessonsData || []).map(l => l.id);
+  const { data: paymentItems, error: paymentError } = await supabase
+    .from('payment_item')
+    .select('lesson_id, lesson_date')
+    .in('lesson_id', lessonIds);
+
+  if (paymentError) throw paymentError;
+
+  // Create a Set of paid lesson occurrences (lesson_id + date)
+  const paidOccurrences = new Set(
+    (paymentItems || []).map(item => 
+      `${item.lesson_id}-${new Date(item.lesson_date).toISOString()}`
     )
-  `)
-  .or(
-    `and(new_date.not.is.null,new_date.gte.${monthStart.toISOString()},new_date.lte.${monthEnd.toISOString()}),` +
-    `and(new_date.is.null,original_date.gte.${monthStart.toISOString()},original_date.lte.${monthEnd.toISOString()})`
-  )
-  .order('original_date');
+  );
 
-  if (overrideLessonsError) throw overrideLessonsError;
+  // Fetch all lesson notes for per-occurrence notes
+  const { data: lessonNotes, error: notesError } = await supabase
+    .from('lesson_note')
+    .select('lesson_id, lesson_date, note')
+    .in('lesson_id', lessonIds);
 
-  // Build override lookup map
-  const overrideMap = buildOverrideMap(overrideLessonsData || []);
+  if (notesError) throw notesError;
 
-  // Expand recurring lessons and apply overrides
-  const lessonsWithOccurrences = expandLessonsWithOverrides(
+  // Create a Map of lesson notes (lesson_id + date) -> note
+  const noteMap = new Map<string, string>();
+  (lessonNotes || []).forEach(note => {
+    const key = `${note.lesson_id}-${new Date(note.lesson_date).toISOString()}`;
+    noteMap.set(key, note.note);
+  });
+
+  // Expand recurring lessons for this month
+  const expandedLessons = expandRecurringLessons(
     lessonsData || [],
-    overrideMap,
     monthStart,
-    monthEnd
+    monthEnd,
+    paidOccurrences,
+    noteMap
   );
 
   // Sort by date
-  lessonsWithOccurrences.sort(
+  expandedLessons.sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
-  return lessonsWithOccurrences;
+  return expandedLessons;
 }
 
+/**
+ * Expands recurring lessons to generate occurrences for the given date range
+ * Also marks each occurrence as paid/unpaid based on payment_items
+ * and attaches notes from lesson_note table
+ */
+function expandRecurringLessons(
+  lessons: any[],
+  monthStart: Date,
+  monthEnd: Date,
+  paidOccurrences: Set<string>,
+  noteMap: Map<string, string>
+): LessonWithStudent[] {
+  const result: LessonWithStudent[] = [];
+
+  for (const lesson of lessons) {
+    if (lesson.recurrence_rule) {
+      // Recurring lesson - generate occurrences
+      try {
+        const rrule = rrulestr(lesson.recurrence_rule);
+        const occurrences = rrule.between(monthStart, monthEnd, true);
+
+        for (const occurrence of occurrences) {
+          const occurrenceDate = occurrence.toISOString();
+          const occurrenceKey = `${lesson.id}-${occurrenceDate}`;
+          
+          // Get note for this occurrence from noteMap, fallback to lesson.note for backwards compatibility
+          const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
+          
+          result.push({
+            ...lesson,
+            date: occurrenceDate,
+            paid: paidOccurrences.has(occurrenceKey),
+            note: occurrenceNote,
+          });
+        }
+      } catch (error) {
+        console.error(`Error parsing recurrence rule for lesson ${lesson.id}:`, error);
+        // Skip this lesson if rrule is invalid
+      }
+    } else {
+      // Non-recurring lesson - include if within month range
+      const lessonDate = new Date(lesson.date);
+      if (lessonDate >= monthStart && lessonDate <= monthEnd) {
+        const occurrenceDateISO = new Date(lesson.date).toISOString();
+        const occurrenceKey = `${lesson.id}-${occurrenceDateISO}`;
+        
+        // Get note for this occurrence from noteMap, fallback to lesson.note
+        const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
+        
+        result.push({
+          ...lesson,
+          date: occurrenceDateISO,
+          paid: paidOccurrences.has(occurrenceKey),
+          note: occurrenceNote,
+        });
+      }
+    }
+  }
+
+  return result;
+}

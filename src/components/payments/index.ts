@@ -7,7 +7,7 @@
  * Components:
  * - Payments: Main container component
  * - PaymentSummary: Displays payment statistics
- * - PaymentForm: Add/edit payment form
+ * - PaymentForm: Add/edit payment form (includes modal)
  * - PaymentFilter: Filter payments by student
  * - PaymentTable: Display payments in a table
  * 

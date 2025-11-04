@@ -17,6 +17,16 @@ export interface Database {
         Insert: Omit<Payment, 'id'>;
         Update: Partial<Omit<Payment, 'id'>>;
       };
+      payment_item: {
+        Row: PaymentItem;
+        Insert: Omit<PaymentItem, 'id' | 'created_at'>;
+        Update: Partial<Omit<PaymentItem, 'id' | 'created_at'>>;
+      };
+      lesson_note: {
+        Row: LessonNote;
+        Insert: Omit<LessonNote, 'id' | 'created_at'>;
+        Update: Partial<Omit<LessonNote, 'id' | 'created_at'>>;
+      };
     };
   };
 }
@@ -33,7 +43,6 @@ export interface Lesson {
   id: number;
   date: string;
   duration: number;
-  paid: boolean;
   student_id: number;
   recurrence_rule: string | null;
   note: string | null;
@@ -43,21 +52,26 @@ export interface Lesson {
 export interface Payment {
   id: number;
   date: string;
-  amount: number;
+  total_amount: number;
   method: string | null;
   student_id: number;
+  notes: string | null;
 }
 
+export interface PaymentItem {
+  id: number;
+  payment_id: number;
+  lesson_id: number;
+  lesson_date: string;  // The specific occurrence date (for recurring lessons)
+  amount: number;
+  created_at: string;
+}
 
-export interface LessonOverride {
+export interface LessonNote {
   id: number;
   lesson_id: number;
-  original_date: string;
-  new_date: string | null;
-  new_duration: number | null;
-  paid: boolean;
-  cancelled: boolean;
-  note: string | null;
+  lesson_date: string;  // The specific occurrence date (for recurring lessons)
+  note: string;
   created_at: string;
 }
 

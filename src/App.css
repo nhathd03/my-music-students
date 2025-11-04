@@ -66,6 +66,9 @@
   border-bottom: 3px solid transparent;
   transition: all 0.2s ease;
   white-space: nowrap;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
 }
 
 .nav-tab:hover {

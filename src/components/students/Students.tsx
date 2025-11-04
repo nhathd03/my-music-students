@@ -2,7 +2,7 @@ import { Plus } from 'lucide-react';
 import { useStudents } from './hooks/useStudents';
 import StudentForm from './StudentForm';
 import StudentList from './StudentList';
-import '../Students.css';
+import './styles/Students.css';
 
 /**
  * Students Component (Main Container)

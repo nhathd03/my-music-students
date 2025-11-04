@@ -1,27 +1,18 @@
+import { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { format } from 'date-fns';
 import { Plus } from 'lucide-react';
 import { usePayments } from './hooks/usePayments';
 import PaymentSummary from './PaymentSummary';
 import PaymentForm from './PaymentForm';
 import PaymentFilter from './PaymentFilter';
 import PaymentTable from './PaymentTable';
-import '../Payments.css';
+import './styles/Payments.css';
 
-/**
- * Payments Component (Main Container)
- * 
- * This is the main container component that orchestrates all payment-related
- * functionality. It delegates specific responsibilities to smaller,
- * focused sub-components:
- * 
- * - PaymentSummary: Displays total earnings and payment count
- * - PaymentForm: Handles adding/editing payment records
- * - PaymentFilter: Allows filtering payments by student
- * - PaymentTable: Displays the list of payments
- * 
- * Business logic is managed by the usePayments custom hook,
- * keeping this component focused on composition and layout.
- */
 export default function Payments() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const processedStateRef = useRef(false);
   const {
     // State
     payments,
@@ -32,6 +23,8 @@ export default function Payments() {
     selectedStudent,
     formData,
     totalAmount,
+    unpaidLessons,
+    loadingLessons,
 
     // Actions
     handleSubmit,
@@ -42,6 +35,82 @@ export default function Payments() {
     setShowForm,
     setSelectedStudent,
   } = usePayments();
+
+  // Store lessonToPay to pre-select after unpaidLessons loads
+  const lessonToPayRef = useRef<{ id: number; date: string; studentId: number } | null>(null);
+
+  useEffect(() => {
+    const state = location.state as { lessonToPay?: { id: number; date: string; studentId: number } };
+    if (state?.lessonToPay && !processedStateRef.current) {
+      processedStateRef.current = true;
+      lessonToPayRef.current = state.lessonToPay;
+      
+      // Format the lesson date for the payment date field
+      const lessonDate = new Date(state.lessonToPay.date);
+      const paymentDate = format(lessonDate, 'yyyy-MM-dd');
+      
+      // Normalize the lesson date to ISO format to match unpaidLessons format
+      const normalizedLessonDate = lessonDate.toISOString();
+      
+      updateFormData({
+        student_id: state.lessonToPay.studentId.toString(),
+        selectedLessons: [{ id: state.lessonToPay.id, date: normalizedLessonDate }],
+        date: paymentDate,
+      });
+      
+      setShowForm(true);
+      
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, updateFormData, setShowForm, navigate]);
+  
+  useEffect(() => {
+    return () => {
+      processedStateRef.current = false;
+    };
+  }, []);
+
+  // Pre-select lesson and calculate amount when unpaidLessons load
+  useEffect(() => {
+    if (showForm && unpaidLessons.length > 0 && lessonToPayRef.current) {
+      const lessonToPay = lessonToPayRef.current;
+      const normalizedDate = new Date(lessonToPay.date).toISOString();
+      
+      // Find the matching lesson in unpaidLessons (normalize dates for comparison)
+      const matchingLesson = unpaidLessons.find(l => {
+        const lessonDateISO = new Date(l.date).toISOString();
+        return l.id === lessonToPay.id && lessonDateISO === normalizedDate;
+      });
+      
+      if (matchingLesson) {
+        // Check if already selected (normalize dates for comparison)
+        const isAlreadySelected = formData.selectedLessons.some(selected => {
+          const selectedDateISO = new Date(selected.date).toISOString();
+          const matchingDateISO = new Date(matchingLesson.date).toISOString();
+          return selected.id === matchingLesson.id && selectedDateISO === matchingDateISO;
+        });
+        
+        if (!isAlreadySelected) {
+          // Pre-select the lesson
+          updateFormData({
+            selectedLessons: [{ id: matchingLesson.id, date: matchingLesson.date }],
+          });
+        }
+        
+        // Calculate total amount if not already set
+        if (formData.total_amount === '') {
+          const student = students.find(s => s.id === parseInt(formData.student_id));
+          if (student && student.rate) {
+            const totalAmount = ((student.rate / 60) * matchingLesson.duration).toFixed(2);
+            updateFormData({ total_amount: totalAmount });
+          }
+        }
+      }
+      
+      // Clear the ref after processing
+      lessonToPayRef.current = null;
+    }
+  }, [showForm, unpaidLessons, formData.selectedLessons, formData.student_id, formData.total_amount, students, updateFormData]);
 
   // Loading state
   if (loading) {
@@ -68,12 +137,14 @@ export default function Payments() {
         paymentCount={payments.length} 
       />
 
-      {/* Form Section - Add/Edit payments */}
+      {/* Form Modal - Add/Edit payments */}
       {showForm && (
         <PaymentForm
           students={students}
           formData={formData}
           editingPayment={editingPayment}
+          unpaidLessons={unpaidLessons}
+          loadingLessons={loadingLessons}
           onSubmit={handleSubmit}
           onCancel={resetForm}
           onChange={updateFormData}

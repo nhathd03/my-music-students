@@ -38,9 +38,10 @@ export function useCalendar() {
     date: '',
     time: '',
     duration: '60',
-    paid: false,
     recurrence_rule: null,
+    note: null,
   });
+  const [originalFormData, setOriginalFormData] = useState<LessonFormData | null>(null);
   
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
@@ -53,7 +54,7 @@ export function useCalendar() {
   // Recurring edit modal state
   const [showRecurringEditModal, setShowRecurringEditModal] = useState(false);
   const [recurringEditScope, setRecurringEditScope] = useState<'single' | 'future' | null>(null);
-  const [recurringAction, setRecurringAction] = useState<'edit' | 'delete' | 'togglePaid' | null>(null);
+  const [recurringAction, setRecurringAction] = useState<'edit' | 'delete' | null>(null);
 
   // ============================================================================
   // Data Fetching
@@ -124,6 +125,12 @@ export function useCalendar() {
       // Only update if the rrule actually changed to avoid infinite loops
       if (rrule !== formData.recurrence_rule) {
         updateFormData({ recurrence_rule: rrule });
+        
+        // If editing and the RRULE was just regenerated from parsing,
+        // update originalFormData
+        if (editingLesson && originalFormData && originalFormData.recurrence_rule) {
+          setOriginalFormData({ ...originalFormData, recurrence_rule: rrule });
+        }
       }
     } else if (!isRecurring && formData.recurrence_rule !== null) {
       updateFormData({ recurrence_rule: null });
@@ -200,12 +207,16 @@ export function useCalendar() {
         student_id: parseInt(formData.student_id),
         date: lessonDateTimeLocal.toISOString(),
         duration: parseInt(formData.duration),
-        paid: formData.paid,
       };
       
       // Include recurrence_rule if present
       if (formData.recurrence_rule) {
         lessonData.recurrence_rule = formData.recurrence_rule;
+      }
+      
+      // Include note if present
+      if (formData.note) {
+        lessonData.note = formData.note;
       }
 
       if (editingLesson && editingLesson.recurrence_rule && recurringEditScope === 'single') {
@@ -248,14 +259,17 @@ export function useCalendar() {
       setIsRecurring(false);
     }
 
-    setFormData({
+    const initialFormData = {
       student_id: lesson.student_id.toString(),
       date: format(lessonDate, 'yyyy-MM-dd'),
       time: format(lessonDate, 'HH:mm'),
       duration: lesson.duration.toString(),
-      paid: lesson.paid,
       recurrence_rule: lesson.recurrence_rule || null,
-    });
+      note: lesson.note || null,
+    };
+
+    setFormData(initialFormData);
+    setOriginalFormData(initialFormData); // Store original for comparison
 
     setShowForm(true);
   };
@@ -267,31 +281,10 @@ export function useCalendar() {
   /**
    * Deletes a lesson after confirmation
    * For recurring lessons, shows modal to choose delete scope
-   * Exception: If deleting the last occurrence, skips modal and treats as single deletion
    */
   const handleDelete = async (lesson: Lesson) => {
-    // For recurring lessons, check if it's the last occurrence
+    // For recurring lessons, show scope selection modal
     if (lesson.recurrence_rule) {
-      // Check if this is the last occurrence in the series
-      const isLast = await lessonService.isLastOccurrence(lesson);
-      
-      if (isLast) {
-        // If last occurrence, delete as single without showing modal
-        if (!confirm('Are you sure you want to delete this lesson?')) {
-          return;
-        }
-
-        try {
-          await lessonService.deleteSingleOccurrence(lesson);
-          fetchData();
-        } catch (error) {
-          console.error('Error deleting lesson:', error);
-          alert('Failed to delete lesson');
-        }
-        return;
-      }
-
-      // For non-last occurrences, show scope selection modal
       setEditingLesson(lesson);
       setRecurringAction('delete');
       setShowRecurringEditModal(true);
@@ -341,26 +334,35 @@ export function useCalendar() {
   };
 
   // ============================================================================
-  // Toggle Paid Handler
+  // Toggle Paid Handler - REMOVED
   // ============================================================================
-
+  
   /**
-   * Toggles the paid status of a lesson
-   * For recurring lessons, uses lesson_override table
+   * NOTE: Paid status is no longer tracked on lessons.
+   * It's now determined by payment_items linking lessons to payments.
+   * To mark a lesson as paid, create a payment record that references the lesson.
    */
-  const togglePaid = async (lesson: Lesson) => {
-    try {
-      await lessonService.toggleLessonPaid(lesson);
-      fetchData();
-    } catch (error) {
-      console.error('Error toggling paid:', error);
-      alert('Failed to update lesson');
-    }
-  };
 
   // ============================================================================
   // Helper Functions
   // ============================================================================
+
+  /**
+   * Check if the form has been modified from its original state
+   * Returns true if any field has changed
+   */
+  const hasFormChanged = (): boolean => {
+    if (!originalFormData) return true; // New lesson, always allow submit
+    
+    return (
+      formData.student_id !== originalFormData.student_id ||
+      formData.date !== originalFormData.date ||
+      formData.time !== originalFormData.time ||
+      formData.duration !== originalFormData.duration ||
+      formData.recurrence_rule !== originalFormData.recurrence_rule ||
+      formData.note !== originalFormData.note
+    );
+  };
 
   /**
    * Resets recurring-related state after an action
@@ -375,7 +377,8 @@ export function useCalendar() {
    * Resets the form to its initial state
    */
   const resetForm = () => {
-    setFormData({ student_id: '', date: '', time: '', duration: '60', paid: false, recurrence_rule: null });
+    setFormData({ student_id: '', date: '', time: '', duration: '60', recurrence_rule: null, note: null });
+    setOriginalFormData(null); // Clear original form data
     setEditingLesson(null);
     setShowForm(false);
     setIsRecurring(false);
@@ -449,12 +452,14 @@ export function useCalendar() {
     handleSubmit,
     handleEdit,
     handleDelete,
-    togglePaid,
     resetForm,
     handleDateClick,
     updateFormData,
     setShowForm,
     goToPreviousMonth,
     goToNextMonth,
+
+    // Form validation
+    hasFormChanged,
   };
 }

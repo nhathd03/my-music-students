@@ -29,7 +29,7 @@ export default function CalendarGrid({
   onDateClick,
   onEditLesson,
   onDeleteLesson,
-  onTogglePaid,
+  onPayLesson,
 }: CalendarGridProps) {
   // Generate calendar days
   const monthStart = startOfMonth(currentDate);
@@ -80,7 +80,7 @@ export default function CalendarGrid({
                     lesson={lesson}
                     onEdit={onEditLesson}
                     onDelete={onDeleteLesson}
-                    onTogglePaid={onTogglePaid}
+                    onPay={onPayLesson}
                   />
                 ))}
               </div>

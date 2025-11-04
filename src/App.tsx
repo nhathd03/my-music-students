@@ -1,18 +1,15 @@
-import { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Music, Users, CalendarDays, DollarSign } from 'lucide-react';
 import Students from './components/students';
 import Calendar from './components/calendar';
 import Payments from './components/payments';
 import './App.css';
 
-type Tab = 'students' | 'calendar' | 'payments';
-
-function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('calendar');
+function AppContent() {
+  const location = useLocation();
 
   return (
     <div className="app">
-      {/* Header */}
       <header className="app-header">
         <div className="container">
           <div className="header-content">
@@ -24,51 +21,59 @@ function App() {
         </div>
       </header>
 
-      {/* Navigation */}
       <nav className="app-nav">
         <div className="container">
           <div className="nav-tabs">
-            <button
-              className={`nav-tab ${activeTab === 'students' ? 'active' : ''}`}
-              onClick={() => setActiveTab('students')}
+            <Link
+              to="/students"
+              className={`nav-tab ${location.pathname === '/students' ? 'active' : ''}`}
             >
               <Users size={20} />
               <span>Students</span>
-            </button>
-            <button
-              className={`nav-tab ${activeTab === 'calendar' ? 'active' : ''}`}
-              onClick={() => setActiveTab('calendar')}
+            </Link>
+            <Link
+              to="/calendar"
+              className={`nav-tab ${location.pathname === '/calendar' ? 'active' : ''}`}
             >
               <CalendarDays size={20} />
               <span>Calendar</span>
-            </button>
-            <button
-              className={`nav-tab ${activeTab === 'payments' ? 'active' : ''}`}
-              onClick={() => setActiveTab('payments')}
+            </Link>
+            <Link
+              to="/payments"
+              className={`nav-tab ${location.pathname === '/payments' ? 'active' : ''}`}
             >
               <DollarSign size={20} />
               <span>Payments</span>
-            </button>
+            </Link>
           </div>
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="app-main">
         <div className="container">
-          {activeTab === 'students' && <Students />}
-          {activeTab === 'calendar' && <Calendar />}
-          {activeTab === 'payments' && <Payments />}
+          <Routes>
+            <Route path="/students" element={<Students />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/payments" element={<Payments />} />
+            <Route path="/" element={<Calendar />} />
+          </Routes>
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="app-footer">
         <div className="container">
           <p>Piano Studio Manager &copy; {new Date().getFullYear()}</p>
         </div>
       </footer>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   );
 }
 

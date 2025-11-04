@@ -34,6 +34,7 @@ export default function PaymentTable({ payments, onEdit, onDelete }: PaymentTabl
             <th>Amount</th>
             <th>Method</th>
             <th>Date</th>
+            <th>Notes</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -50,7 +51,7 @@ export default function PaymentTable({ payments, onEdit, onDelete }: PaymentTabl
               {/* Amount */}
               <td>
                 <span className="amount-cell">
-                  ${parseFloat(payment.amount.toString()).toFixed(2)}
+                  ${parseFloat(payment.total_amount.toString()).toFixed(2)}
                 </span>
               </td>
 
@@ -69,6 +70,17 @@ export default function PaymentTable({ payments, onEdit, onDelete }: PaymentTabl
                   <Calendar size={14} />
                   {format(new Date(payment.date), 'MMM d, yyyy')}
                 </div>
+              </td>
+
+              {/* Notes */}
+              <td>
+                {payment.notes ? (
+                  <span className="payment-table-notes">
+                    {payment.notes}
+                  </span>
+                ) : (
+                  <span className="text-muted">—</span>
+                )}
               </td>
 
               {/* Action Buttons */}

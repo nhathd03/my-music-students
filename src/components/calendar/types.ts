@@ -5,6 +5,7 @@ import type { Lesson, Student } from '../../types/database';
  */
 export interface LessonWithStudent extends Lesson {
   student?: Student;
+  paid?: boolean;  // Calculated from payment_items
 }
 
 /**
@@ -15,8 +16,8 @@ export interface LessonFormData {
   date: string;
   time: string;
   duration: string;
-  paid: boolean;
   recurrence_rule: string | null;
+  note: string | null;
 }
 
 /**
@@ -41,6 +42,7 @@ export interface LessonModalProps {
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
   onChange: (data: Partial<LessonFormData>) => void;
+  hasFormChanged: boolean;
 }
 
 export interface CalendarNavigationProps {
@@ -55,13 +57,13 @@ export interface CalendarGridProps {
   onDateClick: (date: Date) => void;
   onEditLesson: (lesson: Lesson) => void;
   onDeleteLesson: (lesson: Lesson) => void;
-  onTogglePaid: (lesson: Lesson) => void;
+  onPayLesson: (lesson: LessonWithStudent) => void;
 }
 
 export interface LessonPillProps {
   lesson: LessonWithStudent;
   onEdit: (lesson: Lesson) => void;
   onDelete: (lesson: Lesson) => void;
-  onTogglePaid: (lesson: Lesson) => void;
+  onPay: (lesson: LessonWithStudent) => void;
 }
 

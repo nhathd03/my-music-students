@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '../../../lib/supabase';
 import type { Payment, Student } from '../../../types/database';
-import type { PaymentWithStudent, PaymentFormData } from '../types';
+import type { PaymentWithStudent, PaymentFormData, LessonForPayment } from '../types';
+import { fetchUnpaidLessons, createPaymentWithLessons } from '../services/paymentService';
 
 /**
  * Custom Hook: usePayments
@@ -24,19 +25,48 @@ export function usePayments() {
   const [showForm, setShowForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<string>('all');
+  const [unpaidLessons, setUnpaidLessons] = useState<LessonForPayment[]>([]);
+  const [loadingLessons, setLoadingLessons] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState<PaymentFormData>({
     student_id: '',
-    amount: '',
+    selectedLessons: [],
+    total_amount: '',
     method: '',
     date: format(new Date(), 'yyyy-MM-dd'),
+    notes: '',
   });
 
   // Fetch data on mount
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Fetch unpaid lessons when student is selected
+  useEffect(() => {
+    if (formData.student_id) {
+      fetchUnpaidLessonsForStudent(parseInt(formData.student_id));
+    } else {
+      setUnpaidLessons([]);
+    }
+  }, [formData.student_id]);
+
+  /**
+   * Fetches unpaid lessons for a selected student
+   */
+  const fetchUnpaidLessonsForStudent = async (studentId: number) => {
+    try {
+      setLoadingLessons(true);
+      const lessons = await fetchUnpaidLessons(studentId);
+      setUnpaidLessons(lessons);
+    } catch (error) {
+      console.error('Error fetching unpaid lessons:', error);
+      setUnpaidLessons([]);
+    } finally {
+      setLoadingLessons(false);
+    }
+  };
 
   /**
    * Fetches students and payments from Supabase
@@ -86,29 +116,27 @@ export function usePayments() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validation: Must select at least one lesson for new payments
+    if (!editingPayment && formData.selectedLessons.length === 0) {
+      alert('Please select at least one lesson for this payment');
+      return;
+    }
+
     try {
-      const paymentData = {
-        student_id: parseInt(formData.student_id),
-        amount: parseFloat(formData.amount),
-        method: formData.method || null,
-        date: new Date(formData.date).toISOString(),
-      };
-
       if (editingPayment) {
-        // Update existing payment
-        const { error } = await supabase
-          .from('payment')
-          .update(paymentData)
-          .eq('id', editingPayment.id);
-
-        if (error) throw error;
+        // Update existing payment (not implemented yet - would need to update payment_items too)
+        alert('Editing payments is not yet implemented. Please delete and recreate instead.');
+        return;
       } else {
-        // Create new payment
-        const { error } = await supabase
-          .from('payment')
-          .insert([paymentData]);
-
-        if (error) throw error;
+        // Create new payment with lesson links
+        await createPaymentWithLessons(
+          parseInt(formData.student_id),
+          formData.selectedLessons,
+          parseFloat(formData.total_amount),
+          formData.method || null,
+          formData.date,
+          formData.notes || null
+        );
       }
 
       resetForm();
@@ -121,16 +149,20 @@ export function usePayments() {
 
   /**
    * Sets up the form for editing an existing payment
+   * NOTE: Editing is disabled for now since it would require updating payment_items
    */
-  const handleEdit = (payment: Payment) => {
-    setEditingPayment(payment);
-    setFormData({
-      student_id: payment.student_id.toString(),
-      amount: payment.amount.toString(),
-      method: payment.method || '',
-      date: format(new Date(payment.date), 'yyyy-MM-dd'),
-    });
-    setShowForm(true);
+  const handleEdit = (_payment: Payment) => {
+    alert('Editing payments is not yet supported. Please delete and recreate instead.');
+    // setEditingPayment(payment);
+    // setFormData({
+    //   student_id: payment.student_id.toString(),
+    //   selectedLessons: [], // Would need to fetch from payment_items
+    //   total_amount: payment.total_amount.toString(),
+    //   method: payment.method || '',
+    //   date: format(new Date(payment.date), 'yyyy-MM-dd'),
+    //   notes: payment.notes || '',
+    // });
+    // setShowForm(true);
   };
 
   /**
@@ -161,12 +193,15 @@ export function usePayments() {
   const resetForm = () => {
     setFormData({
       student_id: '',
-      amount: '',
+      selectedLessons: [],
+      total_amount: '',
       method: '',
       date: format(new Date(), 'yyyy-MM-dd'),
+      notes: '',
     });
     setEditingPayment(null);
     setShowForm(false);
+    setUnpaidLessons([]);
   };
 
   /**
@@ -183,7 +218,7 @@ export function usePayments() {
 
   // Calculate total amount for filtered payments
   const totalAmount = filteredPayments.reduce(
-    (sum, payment) => sum + parseFloat(payment.amount.toString()),
+    (sum, payment) => sum + parseFloat(payment.total_amount.toString()),
     0
   );
 
@@ -197,6 +232,8 @@ export function usePayments() {
     selectedStudent,
     formData,
     totalAmount,
+    unpaidLessons,
+    loadingLessons,
 
     // Actions
     handleSubmit,

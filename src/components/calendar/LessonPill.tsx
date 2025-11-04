@@ -1,5 +1,5 @@
 import { format, addMinutes } from 'date-fns';
-import { Edit2, Trash2, CheckCircle } from 'lucide-react';
+import { Edit2, Trash2, DollarSign } from 'lucide-react';
 import type { LessonPillProps } from './types';
 
 /**
@@ -28,24 +28,30 @@ function formatLessonTimeRange(startDate: Date, durationMinutes: number): string
  * Displays an individual lesson as a "pill" in the calendar day.
  * 
  * - Shows lesson time range (start - end) and student name
- * - Color-coded by payment status (blue = unpaid, green = paid)
- * - Action buttons: mark as paid, edit, delete
+ * - Paid lessons display with green styling
+ * - Action buttons: edit, delete
  * - Hover effect to show actions
  */
 export default function LessonPill({
   lesson,
   onEdit,
   onDelete,
-  onTogglePaid,
+  onPay,
 }: LessonPillProps) {
   const startDate = parseUTCDate(lesson.date);
   const timeRange = formatLessonTimeRange(startDate, lesson.duration);
+  const hasNote = lesson.note && lesson.note.trim().length > 0;
 
   return (
     <div
-      className={`lesson-pill ${lesson.paid ? 'lesson-paid' : ''}`}
+      className={`lesson-pill ${lesson.paid ? 'lesson-paid' : ''} ${hasNote ? 'lesson-has-note' : ''}`}
       onClick={(e) => e.stopPropagation()}
     >
+      {hasNote && (
+        <div className="lesson-note-tooltip">
+          {lesson.note}
+        </div>
+      )}
       <div className="lesson-pill-content">
         <span className="lesson-time">
           {timeRange}
@@ -53,13 +59,15 @@ export default function LessonPill({
         <span className="lesson-student">{lesson.student?.name}</span>
       </div>
       <div className="lesson-pill-actions">
-        <button
-          className="lesson-action-btn"
-          onClick={() => onTogglePaid(lesson)}
-          title={lesson.paid ? 'Mark as unpaid' : 'Mark as paid'}
-        >
-          <CheckCircle size={14} />
-        </button>
+        {!lesson.paid && (
+          <button
+            className="lesson-action-btn"
+            onClick={() => onPay(lesson)}
+            title="Pay for lesson"
+          >
+            <DollarSign size={14} />
+          </button>
+        )}
         <button
           className="lesson-action-btn"
           onClick={() => onEdit(lesson)}
