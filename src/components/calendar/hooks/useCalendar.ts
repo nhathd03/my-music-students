@@ -349,16 +349,6 @@ export function useCalendar() {
   };
 
   // ============================================================================
-  // Toggle Paid Handler - REMOVED
-  // ============================================================================
-
-  /**
-   * NOTE: Paid status is no longer tracked on lessons.
-   * It's now determined by payment_items linking lessons to payments.
-   * To mark a lesson as paid, create a payment record that references the lesson.
-   */
-
-  // ============================================================================
   // Helper Functions
   // ============================================================================
 
