@@ -20,13 +20,21 @@ export function useStudents() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [showConfirmDiscard, setShowConfirmDiscard] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Form state
   const [formData, setFormData] = useState<StudentFormData>({
     name: '',
     email: '',
     rate: '',
+    description: '',
   });
+  
+  // Track original form data for change detection
+  const [originalFormData, setOriginalFormData] = useState<StudentFormData | null>(null);
 
   // Fetch students on mount
   useEffect(() => {
@@ -65,6 +73,7 @@ export function useStudents() {
         name: formData.name,
         email: formData.email || null,
         rate: formData.rate ? parseFloat(formData.rate) : null,
+        description: formData.description || null,
       };
 
       if (editingStudent) {
@@ -93,38 +102,88 @@ export function useStudents() {
   };
 
   /**
+   * Sets original form data when creating new student
+   */
+  useEffect(() => {
+    if (showForm && !editingStudent) {
+      setOriginalFormData(null);
+    }
+  }, [showForm, editingStudent]);
+
+  /**
    * Sets up the form for editing an existing student
    */
   const handleEdit = (student: Student) => {
-    setEditingStudent(student);
-    setFormData({
+    const initialData = {
       name: student.name,
       email: student.email || '',
       rate: student.rate?.toString() || '',
-    });
+      description: student.description || '',
+    };
+    setEditingStudent(student);
+    setFormData(initialData);
+    setOriginalFormData(initialData);
     setShowForm(true);
   };
 
   /**
-   * Deletes a student after confirmation
+   * Request to delete a student - shows confirmation modal
    * Note: This will cascade delete all associated lessons and payments
    */
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this student? This will also delete all their lessons and payments.')) {
-      return;
-    }
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id);
+    setShowConfirmDelete(true);
+  };
+
+  /**
+   * Confirm delete student
+   */
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteId) return;
 
     try {
       const { error } = await supabase
         .from('student')
         .delete()
-        .eq('id', id);
+        .eq('id', pendingDeleteId);
 
       if (error) throw error;
       fetchStudents();
+      setShowConfirmDelete(false);
+      setPendingDeleteId(null);
     } catch (error) {
       console.error('Error deleting student:', error);
       alert('Failed to delete student');
+      setShowConfirmDelete(false);
+      setPendingDeleteId(null);
+    }
+  };
+
+  /**
+   * Check if form has unsaved changes
+   */
+  const hasFormChanged = (): boolean => {
+    if (!originalFormData) {
+      // New student - check if any field has value
+      return !!(formData.name || formData.email || formData.rate || formData.description);
+    }
+    
+    return (
+      formData.name !== originalFormData.name ||
+      formData.email !== originalFormData.email ||
+      formData.rate !== originalFormData.rate ||
+      formData.description !== originalFormData.description
+    );
+  };
+
+  /**
+   * Request to close modal - shows confirmation if there are unsaved changes
+   */
+  const handleRequestClose = () => {
+    if (hasFormChanged()) {
+      setShowConfirmDiscard(true); // Show confirmation modal (form stays visible underneath)
+    } else {
+      resetForm();
     }
   };
 
@@ -132,9 +191,18 @@ export function useStudents() {
    * Resets the form to its initial state
    */
   const resetForm = () => {
-    setFormData({ name: '', email: '', rate: '' });
+    setFormData({ name: '', email: '', rate: '', description: '' });
     setEditingStudent(null);
+    setOriginalFormData(null);
     setShowForm(false);
+    setShowConfirmDiscard(false);
+  };
+
+  /**
+   * Confirm discard changes
+   */
+  const handleConfirmDiscard = () => {
+    resetForm();
   };
 
   /**
@@ -144,21 +212,48 @@ export function useStudents() {
     setFormData({ ...formData, ...data });
   };
 
+  /**
+   * Filter students based on search query
+   * Searches in name, email, and description
+   */
+  const filteredStudents = students.filter(student => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase().trim();
+    const nameMatch = student.name.toLowerCase().includes(query);
+    const emailMatch = student.email?.toLowerCase().includes(query) || false;
+    const descriptionMatch = student.description?.toLowerCase().includes(query) || false;
+    
+    return nameMatch || emailMatch || descriptionMatch;
+  });
+
   return {
     // State
-    students,
+    students: filteredStudents,
+    allStudents: students, // Keep original for reference if needed
     loading,
     showForm,
     editingStudent,
     formData,
+    showConfirmDiscard,
+    showConfirmDelete,
+    searchQuery,
 
     // Actions
     handleSubmit,
     handleEdit,
     handleDelete,
+    handleRequestClose,
+    handleConfirmDiscard,
+    handleConfirmDelete,
     resetForm,
     updateFormData,
     setShowForm,
+    setSearchQuery,
+    hasFormChanged,
+    setShowConfirmDelete,
+    setPendingDeleteId,
+    setShowConfirmDiscard,
   };
 }
 

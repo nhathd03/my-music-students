@@ -7,6 +7,7 @@ import PaymentSummary from './PaymentSummary';
 import PaymentForm from './PaymentForm';
 import PaymentFilter from './PaymentFilter';
 import PaymentTable from './PaymentTable';
+import ConfirmationModal from '../shared/ConfirmationModal';
 import './styles/Payments.css';
 
 export default function Payments() {
@@ -20,20 +21,30 @@ export default function Payments() {
     loading,
     showForm,
     editingPayment,
-    selectedStudent,
     formData,
     totalAmount,
     unpaidLessons,
     loadingLessons,
+    filters,
 
     // Actions
     handleSubmit,
     handleEdit,
     handleDelete,
+    handleRequestClose,
+    handleConfirmDiscard,
+    handleConfirmDelete,
     resetForm,
     updateFormData,
     setShowForm,
-    setSelectedStudent,
+    handleFilterChange,
+    handleClearFilters,
+    
+    // Confirmation modals
+    showConfirmDiscard,
+    showConfirmDelete,
+    setShowConfirmDiscard,
+    setShowConfirmDelete,
   } = usePayments();
 
   // Store lessonToPay to pre-select after unpaidLessons loads
@@ -125,7 +136,11 @@ export default function Payments() {
           <h2>Payments</h2>
           <p className="payments-subtitle">Track student payments and earnings</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+        <button className="btn btn-primary" onClick={() => {
+          // Reset form to initial state when opening
+          resetForm();
+          setShowForm(true);
+        }}>
           <Plus size={18} />
           Add Payment
         </button>
@@ -148,14 +163,46 @@ export default function Payments() {
           onSubmit={handleSubmit}
           onCancel={resetForm}
           onChange={updateFormData}
+          onRequestClose={handleRequestClose}
         />
       )}
 
-      {/* Filter Section - Filter by student */}
+      {/* Unsaved Changes Confirmation Modal */}
+      {showConfirmDiscard && (
+        <ConfirmationModal
+          title="Discard Changes?"
+          message="You have unsaved changes. Are you sure you want to discard them?"
+          confirmText="Discard"
+          cancelText="Cancel"
+          onConfirm={handleConfirmDiscard}
+          onCancel={() => {
+            setShowConfirmDiscard(false);
+            setShowForm(true); // Re-show the form
+          }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showConfirmDelete && (
+        <ConfirmationModal
+          title="Delete Payment?"
+          message="Are you sure you want to delete this payment record?"
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="danger"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => {
+            setShowConfirmDelete(false);
+          }}
+        />
+      )}
+
+      {/* Filter Section */}
       <PaymentFilter
         students={students}
-        selectedStudent={selectedStudent}
-        onFilterChange={setSelectedStudent}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onClearFilters={handleClearFilters}
       />
 
       {/* Table Section - Display all payments */}

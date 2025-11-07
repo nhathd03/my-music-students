@@ -170,3 +170,47 @@ export async function createPaymentWithLessons(
   }
 }
 
+/**
+ * Marks a lesson occurrence as unpaid
+ */
+export async function markLessonAsUnpaid(lessonId: number, lessonDate: string): Promise<void> {
+  try {
+    const lessonDateISO = new Date(lessonDate).toISOString();
+    
+    // Step 1: Find the payment_id for this lesson occurrence
+    const { data: paymentItem, error: fetchError } = await supabase
+      .from('payment_item')
+      .select('payment_id')
+      .eq('lesson_id', lessonId)
+      .eq('lesson_date', lessonDateISO)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        // No payment item found - lesson is already unpaid
+        console.log(`No payment found for lesson ${lessonId} on ${lessonDate}`);
+        return;
+      }
+      throw fetchError;
+    }
+
+    if (!paymentItem) {
+      console.log(`No payment found for lesson ${lessonId} on ${lessonDate}`);
+      return;
+    }
+
+    // Step 2: Delete the payment record (cascade will delete payment_items)
+    const { error: deleteError } = await supabase
+      .from('payment')
+      .delete()
+      .eq('id', paymentItem.payment_id);
+
+    if (deleteError) throw deleteError;
+
+    console.log(`Deleted payment ${paymentItem.payment_id} for lesson ${lessonId} occurrence on ${lessonDate}`);
+  } catch (error) {
+    console.error('Error marking lesson as unpaid:', error);
+    throw error;
+  }
+}
+

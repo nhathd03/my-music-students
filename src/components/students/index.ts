@@ -6,7 +6,7 @@
  * 
  * Components:
  * - Students: Main container component
- * - StudentForm: Add/edit student form
+ * - StudentModal: Add/edit student form
  * - StudentList: Grid of student cards
  * - StudentCard: Individual student display
  * 
@@ -18,7 +18,7 @@
  */
 
 export { default } from './Students';
-export { default as StudentForm } from './StudentForm';
+export { default as StudentModal } from './StudentModal';
 export { default as StudentList } from './StudentList';
 export { default as StudentCard } from './StudentCard';
 export { useStudents } from './hooks/useStudents';

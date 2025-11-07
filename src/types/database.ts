@@ -36,6 +36,7 @@ export interface Student {
   name: string;
   email: string | null;
   rate: number | null;
+  description: string | null;
   created_at: string;
 }
 
@@ -62,7 +63,7 @@ export interface PaymentItem {
   id: number;
   payment_id: number;
   lesson_id: number;
-  lesson_date: string;  // The specific occurrence date (for recurring lessons)
+  lesson_date: string;  
   amount: number;
   created_at: string;
 }
@@ -70,7 +71,7 @@ export interface PaymentItem {
 export interface LessonNote {
   id: number;
   lesson_id: number;
-  lesson_date: string;  // The specific occurrence date (for recurring lessons)
+  lesson_date: string; 
   note: string;
   created_at: string;
 }

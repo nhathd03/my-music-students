@@ -28,8 +28,9 @@ function formatLessonTimeRange(startDate: Date, durationMinutes: number): string
  * Displays an individual lesson as a "pill" in the calendar day.
  * 
  * - Shows lesson time range (start - end) and student name
+ * - Displays note directly in the pill when present
  * - Paid lessons display with green styling
- * - Action buttons: edit, delete
+ * - Action buttons: edit, delete, pay/unpay
  * - Hover effect to show actions
  */
 export default function LessonPill({
@@ -37,48 +38,81 @@ export default function LessonPill({
   onEdit,
   onDelete,
   onPay,
+  onUnpay,
+  onMobileClick,
 }: LessonPillProps) {
   const startDate = parseUTCDate(lesson.date);
   const timeRange = formatLessonTimeRange(startDate, lesson.duration);
   const hasNote = lesson.note && lesson.note.trim().length > 0;
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // On mobile, show modal instead of individual button actions
+    // Only trigger if we're on mobile (screen width <= 768px)
+    if (onMobileClick && window.innerWidth <= 768) {
+      onMobileClick();
+    }
+  };
+
+  const handleButtonClick = (e: React.MouseEvent, action: () => void) => {
+    e.stopPropagation();
+    action();
+  };
+
   return (
     <div
       className={`lesson-pill ${lesson.paid ? 'lesson-paid' : ''} ${hasNote ? 'lesson-has-note' : ''}`}
-      onClick={(e) => e.stopPropagation()}
+      onClick={handleClick}
     >
-      {hasNote && (
-        <div className="lesson-note-tooltip">
-          {lesson.note}
-        </div>
-      )}
       <div className="lesson-pill-content">
-        <span className="lesson-time">
-          {timeRange}
-        </span>
-        <span className="lesson-student">{lesson.student?.name}</span>
+        {/* Time and Student Info */}
+        <div className="lesson-main-info">
+          <span className="lesson-time">{timeRange}</span>
+          <span className="lesson-student">{lesson.student?.name}</span>
+        </div>
+        
+        {/* Note Section - Displayed inside the pill */}
+        {hasNote && (
+          <div className="lesson-note">
+            <span className="lesson-note-text">{lesson.note}</span>
+          </div>
+        )}
       </div>
+
+      {/* Action Buttons */}
       <div className="lesson-pill-actions">
-        {!lesson.paid && (
+        {lesson.paid && onUnpay ? (
           <button
             className="lesson-action-btn"
-            onClick={() => onPay(lesson)}
-            title="Pay for lesson"
+            onClick={(e) => handleButtonClick(e, () => onUnpay(lesson))}
+            title="Mark as unpaid"
+            aria-label="Mark as unpaid"
           >
             <DollarSign size={14} />
           </button>
-        )}
+        ) : !lesson.paid ? (
+          <button
+            className="lesson-action-btn"
+            onClick={(e) => handleButtonClick(e, () => onPay(lesson))}
+            title="Pay for lesson"
+            aria-label="Pay for lesson"
+          >
+            <DollarSign size={14} />
+          </button>
+        ) : null}
         <button
           className="lesson-action-btn"
-          onClick={() => onEdit(lesson)}
+          onClick={(e) => handleButtonClick(e, () => onEdit(lesson))}
           title="Edit lesson"
+          aria-label="Edit lesson"
         >
           <Edit2 size={14} />
         </button>
         <button
           className="lesson-action-btn lesson-delete-btn"
-          onClick={() => onDelete(lesson)}
+          onClick={(e) => handleButtonClick(e, () => onDelete(lesson))}
           title="Delete lesson"
+          aria-label="Delete lesson"
         >
           <Trash2 size={14} />
         </button>

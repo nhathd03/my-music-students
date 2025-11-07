@@ -43,6 +43,7 @@ export interface LessonModalProps {
   onCancel: () => void;
   onChange: (data: Partial<LessonFormData>) => void;
   hasFormChanged: boolean;
+  onRequestClose?: () => void;
 }
 
 export interface CalendarNavigationProps {
@@ -58,6 +59,8 @@ export interface CalendarGridProps {
   onEditLesson: (lesson: Lesson) => void;
   onDeleteLesson: (lesson: Lesson) => void;
   onPayLesson: (lesson: LessonWithStudent) => void;
+  onUnpayLesson?: (lesson: LessonWithStudent) => void;
+  onLessonClick?: (lesson: LessonWithStudent) => void;
 }
 
 export interface LessonPillProps {
@@ -65,5 +68,7 @@ export interface LessonPillProps {
   onEdit: (lesson: Lesson) => void;
   onDelete: (lesson: Lesson) => void;
   onPay: (lesson: LessonWithStudent) => void;
+  onUnpay?: (lesson: LessonWithStudent) => void;
+  onMobileClick?: () => void;
 }
 

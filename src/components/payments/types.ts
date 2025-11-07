@@ -44,6 +44,7 @@ export interface PaymentFormProps {
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
   onChange: (data: Partial<PaymentFormData>) => void;
+  onRequestClose?: () => void;
 }
 
 export interface PaymentSummaryProps {
@@ -51,10 +52,24 @@ export interface PaymentSummaryProps {
   paymentCount: number;
 }
 
+/**
+ * Payment filter criteria
+ */
+export interface PaymentFilters {
+  studentSearch: string;  // Search query for student name
+  studentId: string;      // Selected student ID (or 'all')
+  dateFrom: string;        // Filter payments from this date (YYYY-MM-DD)
+  dateTo: string;          // Filter payments until this date (YYYY-MM-DD)
+  method: string;          // Payment method filter (or 'all')
+  amountMin: string;       // Minimum amount
+  amountMax: string;       // Maximum amount
+}
+
 export interface PaymentFilterProps {
   students: Student[];
-  selectedStudent: string;
-  onFilterChange: (studentId: string) => void;
+  filters: PaymentFilters;
+  onFilterChange: (filters: Partial<PaymentFilters>) => void;
+  onClearFilters: () => void;
 }
 
 export interface PaymentTableProps {

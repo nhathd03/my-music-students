@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { format } from 'date-fns';
 import type { PaymentFormProps, LessonForPayment } from './types';
 
@@ -21,6 +22,7 @@ export default function PaymentForm({
   onSubmit,
   onCancel,
   onChange,
+  onRequestClose,
 }: PaymentFormProps) {
   
   /**
@@ -29,6 +31,14 @@ export default function PaymentForm({
    */
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
+      handleClose();
+    }
+  };
+
+  const handleClose = () => {
+    if (onRequestClose) {
+      onRequestClose();
+    } else {
       onCancel();
     }
   };
@@ -96,62 +106,72 @@ export default function PaymentForm({
   return (
     <div className="modal-overlay" onClick={handleOverlayClick}>
       <div className="modal-content">
-        <div className="card payment-form">
-          <h3>{editingPayment ? 'Edit Payment' : 'Record New Payment'}</h3>
-          <form onSubmit={onSubmit}>
-            <div className="form-grid">
-              {/* Student Selection */}
-              <div className="form-group">
-                <label className="label" htmlFor="student">Student *</label>
-                <select
-                  id="student"
-                  className="input"
-                  value={formData.student_id}
+    <div className="card payment-form">
+          <div className="modal-header">
+      <h3>{editingPayment ? 'Edit Payment' : 'Record New Payment'}</h3>
+            <button
+              type="button"
+              className="modal-close-btn"
+              onClick={handleClose}
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
+      <form onSubmit={onSubmit}>
+        <div className="form-grid">
+          {/* Student Selection */}
+          <div className="form-group">
+            <label className="label" htmlFor="student">Student *</label>
+            <select
+              id="student"
+              className="input"
+              value={formData.student_id}
                   onChange={(e) => onChange({ student_id: e.target.value, selectedLessons: [], total_amount: '' })}
-                  required
-                >
-                  <option value="">Select a student</option>
-                  {students.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              required
+            >
+              <option value="">Select a student</option>
+              {students.map((student) => (
+                <option key={student.id} value={student.id}>
+                  {student.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-              {/* Payment Method */}
-              <div className="form-group">
-                <label className="label" htmlFor="method">Payment Method</label>
-                <select
-                  id="method"
-                  className="input"
-                  value={formData.method}
-                  onChange={(e) => onChange({ method: e.target.value })}
-                >
-                  <option value="">Select method</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Check">Check</option>
-                  <option value="Credit Card">Credit Card</option>
-                  <option value="Debit Card">Debit Card</option>
-                  <option value="Venmo">Venmo</option>
-                  <option value="PayPal">PayPal</option>
-                  <option value="Zelle">Zelle</option>
-                  <option value="Bank Transfer">Bank Transfer</option>
-                </select>
-              </div>
+          {/* Payment Method */}
+          <div className="form-group">
+            <label className="label" htmlFor="method">Payment Method</label>
+            <select
+              id="method"
+              className="input"
+              value={formData.method}
+              onChange={(e) => onChange({ method: e.target.value })}
+            >
+              <option value="">Select method</option>
+              <option value="Cash">Cash</option>
+              <option value="Check">Check</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="Debit Card">Debit Card</option>
+              <option value="Venmo">Venmo</option>
+              <option value="PayPal">PayPal</option>
+              <option value="Zelle">Zelle</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
 
-              {/* Date Picker */}
-              <div className="form-group">
-                <label className="label" htmlFor="date">Date *</label>
-                <input
-                  id="date"
-                  type="date"
-                  className="input"
-                  value={formData.date}
-                  onChange={(e) => onChange({ date: e.target.value })}
-                  required
-                />
-              </div>
+          {/* Date Picker */}
+          <div className="form-group">
+            <label className="label" htmlFor="date">Date *</label>
+            <input
+              id="date"
+              type="date"
+              className="input"
+              value={formData.date}
+              onChange={(e) => onChange({ date: e.target.value })}
+              required
+            />
+          </div>
 
               {/* Total Amount */}
               <div className="form-group">
@@ -180,7 +200,7 @@ export default function PaymentForm({
                 placeholder="e.g., January lessons"
                 rows={2}
               />
-            </div>
+        </div>
 
             {/* Unpaid Lessons Section */}
             {formData.student_id && (
@@ -229,16 +249,20 @@ export default function PaymentForm({
               </div>
             )}
 
-            {/* Form Actions */}
+        {/* Form Actions */}
             <div className="form-actions payment-form-actions-spaced">
-              <button type="submit" className="btn btn-primary">
-                {editingPayment ? 'Update Payment' : 'Record Payment'}
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={onCancel}>
-                Cancel
-              </button>
-            </div>
-          </form>
+          <button type="submit" className="btn btn-primary">
+            {editingPayment ? 'Update Payment' : 'Record Payment'}
+          </button>
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={onRequestClose || onCancel}
+              >
+            Cancel
+          </button>
+        </div>
+      </form>
         </div>
       </div>
     </div>

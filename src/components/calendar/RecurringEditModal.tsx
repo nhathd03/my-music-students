@@ -1,3 +1,5 @@
+import { X } from 'lucide-react';
+
 /**
  * RecurringEditModal Component
  * 
@@ -60,7 +62,17 @@ export default function RecurringEditModal({ action, setRecurringEditScope, onCa
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-content recurring-edit-modal" onClick={(e) => e.stopPropagation()}>
         <div className="card">
-          <h3>{text.title}</h3>
+          <div className="modal-header">
+            <h3>{text.title}</h3>
+            <button
+              type="button"
+              className="modal-close-btn"
+              onClick={onCancel}
+              title="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
           <p className="recurring-edit-description">
             {text.description}
           </p>

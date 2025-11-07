@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { supabase } from '../../../lib/supabase';
 import type { Payment, Student } from '../../../types/database';
-import type { PaymentWithStudent, PaymentFormData, LessonForPayment } from '../types';
+import type { PaymentWithStudent, PaymentFormData, LessonForPayment, PaymentFilters } from '../types';
 import { fetchUnpaidLessons, createPaymentWithLessons } from '../services/paymentService';
 
 /**
@@ -24,9 +24,19 @@ export function usePayments() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
-  const [selectedStudent, setSelectedStudent] = useState<string>('all');
   const [unpaidLessons, setUnpaidLessons] = useState<LessonForPayment[]>([]);
   const [loadingLessons, setLoadingLessons] = useState(false);
+  
+  // Filter state
+  const [filters, setFilters] = useState<PaymentFilters>({
+    studentSearch: '',
+    studentId: 'all',
+    dateFrom: '',
+    dateTo: '',
+    method: 'all',
+    amountMin: '',
+    amountMax: '',
+  });
 
   // Form state
   const [formData, setFormData] = useState<PaymentFormData>({
@@ -37,6 +47,14 @@ export function usePayments() {
     date: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   });
+  
+  // Track original form data for change detection
+  const [originalFormData, setOriginalFormData] = useState<PaymentFormData | null>(null);
+  
+  // Confirmation modal state
+  const [showConfirmDiscard, setShowConfirmDiscard] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
   // Fetch data on mount
   useEffect(() => {
@@ -148,6 +166,15 @@ export function usePayments() {
   };
 
   /**
+   * Sets original form data when creating new payment
+   */
+  useEffect(() => {
+    if (showForm && !editingPayment) {
+      setOriginalFormData(null);
+    }
+  }, [showForm, editingPayment]);
+
+  /**
    * Sets up the form for editing an existing payment
    * NOTE: Editing is disabled for now since it would require updating payment_items
    */
@@ -166,42 +193,102 @@ export function usePayments() {
   };
 
   /**
-   * Deletes a payment after confirmation
+   * Request to delete a payment - shows confirmation modal
    */
-  const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this payment record?')) {
-      return;
-    }
+  const handleDelete = (id: number) => {
+    setPendingDeleteId(id);
+    setShowConfirmDelete(true);
+  };
+
+  /**
+   * Confirm delete payment
+   */
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteId) return;
 
     try {
       const { error } = await supabase
         .from('payment')
         .delete()
-        .eq('id', id);
+        .eq('id', pendingDeleteId);
 
       if (error) throw error;
       fetchData();
+      setShowConfirmDelete(false);
+      setPendingDeleteId(null);
     } catch (error) {
       console.error('Error deleting payment:', error);
       alert('Failed to delete payment');
+      setShowConfirmDelete(false);
+      setPendingDeleteId(null);
     }
+  };
+
+  /**
+   * Check if form has unsaved changes
+   */
+  const hasFormChanged = (): boolean => {
+    if (!originalFormData) {
+      // New payment - check if user has actually entered data beyond initial state
+      // Initial state: date is pre-filled with today's date
+      // Only show warning if user has entered student, selected lessons, amount, method, or notes
+      return !!(
+        formData.student_id || 
+        formData.selectedLessons.length > 0 || 
+        formData.total_amount || 
+        formData.method || 
+        formData.notes
+      );
+    }
+    
+    return (
+      formData.student_id !== originalFormData.student_id ||
+      JSON.stringify(formData.selectedLessons) !== JSON.stringify(originalFormData.selectedLessons) ||
+      formData.total_amount !== originalFormData.total_amount ||
+      formData.method !== originalFormData.method ||
+      formData.date !== originalFormData.date ||
+      formData.notes !== originalFormData.notes
+    );
+  };
+
+  /**
+   * Request to close modal - shows confirmation if there are unsaved changes
+   */
+  const handleRequestClose = () => {
+    if (hasFormChanged()) {
+      setShowForm(false); // Hide form first, then show confirmation
+      setShowConfirmDiscard(true);
+    } else {
+      resetForm();
+    }
+  };
+
+  /**
+   * Confirm discard changes
+   */
+  const handleConfirmDiscard = () => {
+    resetForm();
+    setShowConfirmDiscard(false);
   };
 
   /**
    * Resets the form to its initial state
    */
   const resetForm = () => {
-    setFormData({
+    const initialFormData: PaymentFormData = {
       student_id: '',
       selectedLessons: [],
       total_amount: '',
       method: '',
       date: format(new Date(), 'yyyy-MM-dd'),
       notes: '',
-    });
+    };
+    setFormData(initialFormData);
     setEditingPayment(null);
+    setOriginalFormData(null);
     setShowForm(false);
     setUnpaidLessons([]);
+    setShowConfirmDiscard(false);
   };
 
   /**
@@ -211,10 +298,84 @@ export function usePayments() {
     setFormData({ ...formData, ...data });
   };
 
-  // Filter payments by selected student
-  const filteredPayments = selectedStudent === 'all'
-    ? payments
-    : payments.filter(p => p.student_id === parseInt(selectedStudent));
+  /**
+   * Update filter criteria
+   */
+  const handleFilterChange = (newFilters: Partial<PaymentFilters>) => {
+    setFilters({ ...filters, ...newFilters });
+  };
+
+  /**
+   * Clear all filters
+   */
+  const handleClearFilters = () => {
+    setFilters({
+      studentSearch: '',
+      studentId: 'all',
+      dateFrom: '',
+      dateTo: '',
+      method: 'all',
+      amountMin: '',
+      amountMax: '',
+    });
+  };
+
+  /**
+   * Filter payments based on all criteria
+   */
+  const filteredPayments = payments.filter(payment => {
+    // Student filter - by ID or search query
+    if (filters.studentId !== 'all') {
+      if (payment.student_id !== parseInt(filters.studentId)) {
+        return false;
+      }
+    } else if (filters.studentSearch.trim()) {
+      const student = payment.student;
+      const searchLower = filters.studentSearch.toLowerCase().trim();
+      
+      // Search in student name/email
+      const studentMatch = student && (
+        student.name.toLowerCase().includes(searchLower) ||
+        student.email?.toLowerCase().includes(searchLower)
+      );
+      
+      // Search in payment notes
+      const notesMatch = payment.notes?.toLowerCase().includes(searchLower) || false;
+      
+      if (!studentMatch && !notesMatch) return false;
+    }
+
+    // Date range filter
+    if (filters.dateFrom) {
+      const paymentDate = new Date(payment.date);
+      const fromDate = new Date(filters.dateFrom);
+      if (paymentDate < fromDate) return false;
+    }
+    if (filters.dateTo) {
+      const paymentDate = new Date(payment.date);
+      const toDate = new Date(filters.dateTo);
+      toDate.setHours(23, 59, 59, 999); // Include entire end date
+      if (paymentDate > toDate) return false;
+    }
+
+    // Payment method filter
+    if (filters.method !== 'all') {
+      if (payment.method !== filters.method) return false;
+    }
+
+    // Amount range filter
+    const amount = parseFloat(payment.total_amount.toString());
+    if (filters.amountMin) {
+      const minAmount = parseFloat(filters.amountMin);
+      if (isNaN(minAmount) || amount < minAmount) return false;
+    }
+    if (filters.amountMax) {
+      const maxAmount = parseFloat(filters.amountMax);
+      if (isNaN(maxAmount) || amount > maxAmount) return false;
+    }
+
+    return true;
+  });
 
   // Calculate total amount for filtered payments
   const totalAmount = filteredPayments.reduce(
@@ -225,24 +386,36 @@ export function usePayments() {
   return {
     // State
     payments: filteredPayments,
+    allPayments: payments, // Keep original for reference
     students,
     loading,
     showForm,
     editingPayment,
-    selectedStudent,
     formData,
     totalAmount,
     unpaidLessons,
     loadingLessons,
+    filters,
 
     // Actions
     handleSubmit,
     handleEdit,
     handleDelete,
+    handleRequestClose,
+    handleConfirmDiscard,
+    handleConfirmDelete,
     resetForm,
     updateFormData,
     setShowForm,
-    setSelectedStudent,
+    handleFilterChange,
+    handleClearFilters,
+    hasFormChanged,
+    
+    // Confirmation modals
+    showConfirmDiscard,
+    showConfirmDelete,
+    setShowConfirmDiscard,
+    setShowConfirmDelete,
   };
 }
 

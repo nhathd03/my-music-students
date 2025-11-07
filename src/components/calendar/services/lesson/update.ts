@@ -236,7 +236,7 @@ export async function updateSingleOccurrence(
 
   // Step 3: Create new series for occurrences AFTER this one (if any)
   const afterOccurrences = allOccurrences.slice(currentIndex + 1);
-  
+
   if (afterOccurrences.length > 0) {
     const nextOccurrence = afterOccurrences[0];
     
@@ -251,7 +251,7 @@ export async function updateSingleOccurrence(
       };
 
       await supabase.from('lesson').insert([singleLessonData]);
-    } else {
+  } else {
       // Multiple occurrences - create new recurring series
       const newSeriesRule = new RRule({
         ...rrule.options,
@@ -370,6 +370,6 @@ export async function updateCurrentAndFutureOccurrences(
   };
 
   await supabase.from('lesson').insert([newLessonData]);
-  
+
   console.log(`Split lesson ${lesson.id}: truncated at ${untilDate.toISOString()}, created new series`);
-}
+  }

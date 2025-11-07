@@ -17,7 +17,7 @@ export default function StudentList({ students, onEdit, onDelete }: StudentListP
   if (students.length === 0) {
     return (
       <div className="card students-empty">
-        <p>No students yet. Add your first student to get started!</p>
+        <p>No students found. Try adjusting your search or add your first student to get started!</p>
       </div>
     );
   }

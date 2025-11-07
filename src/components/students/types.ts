@@ -7,6 +7,7 @@ export interface StudentFormData {
   name: string;
   email: string;
   rate: string;
+  description: string;
 }
 
 /**
@@ -18,6 +19,8 @@ export interface StudentFormProps {
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
   onChange: (data: Partial<StudentFormData>) => void;
+  hasUnsavedChanges?: boolean;
+  onRequestClose?: () => void;
 }
 
 export interface StudentCardProps {

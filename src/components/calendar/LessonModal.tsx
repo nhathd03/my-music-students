@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import type { LessonModalProps } from './types';
 
 /**
@@ -34,11 +35,30 @@ export default function LessonModal({
   onCancel,
   onChange,
   hasFormChanged,
+  onRequestClose,
 }: LessonModalProps) {
+
+  const handleClose = () => {
+    if (onRequestClose) {
+      onRequestClose();
+    } else {
+      onCancel();
+    }
+  };
 
   return (
     <div className="card lesson-form">
+      <div className="modal-header">
       <h3>{editingLesson ? 'Edit Lesson' : 'Schedule New Lesson'}</h3>
+        <button
+          type="button"
+          className="modal-close-btn"
+          onClick={handleClose}
+          title="Close"
+        >
+          <X size={20} />
+        </button>
+      </div>
       <form onSubmit={onSubmit}>
         <div className="form-grid">
           {/* Student Selection */}
@@ -233,7 +253,11 @@ export default function LessonModal({
           >
             {editingLesson ? 'Update Lesson' : 'Schedule Lesson'}
           </button>
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          <button 
+            type="button" 
+            className="btn btn-secondary" 
+            onClick={onRequestClose || onCancel}
+          >
             Cancel
           </button>
         </div>

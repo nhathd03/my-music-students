@@ -1,7 +1,17 @@
+/* Import shared styles - must be at top */
+@import '../../shared/styles/Modal.css';
+@import '../../shared/styles/Form.css';
+@import '../../shared/styles/Container.css';
+
 /* Calendar Component Styles */
 
 .calendar-container {
   padding: 2rem 0;
+  /* Break out of the container max-width to span full screen */
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 
 .calendar-header {
@@ -26,50 +36,16 @@
   color: var(--text-secondary);
 }
 
-/* Modal Overlay & Content */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  padding: 1rem;
-  backdrop-filter: blur(2px);
-}
-
-.modal-content {
-  max-width: 600px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  animation: modalFadeIn 0.2s ease-out;
-}
-
-@keyframes modalFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95) translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
 /* Lesson Form */
 .lesson-form {
   margin-bottom: 0; /* Remove margin when in modal */
 }
 
 .lesson-form h3 {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
   font-size: 1.125rem;
 }
+
 
 /* Calendar Navigation */
 .calendar-nav {
@@ -162,7 +138,7 @@
 
 .day-number {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: clamp(0.75rem, 0.8vw + 0.6rem, 0.875rem);
   color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
@@ -183,11 +159,12 @@
 .lesson-pill {
   background-color: var(--primary-blue);
   color: white;
-  border-radius: var(--radius-sm);
+  border-radius: 2px;
   padding: 0.5rem;
-  font-size: 0.75rem;
+  font-size: clamp(0.65rem, 0.7vw + 0.5rem, 0.75rem);
   position: relative;
   transition: all 0.5s ease;
+  cursor: pointer;
 }
 
 .lesson-pill:hover {
@@ -203,31 +180,69 @@
   background-color: #059669;
 }
 
+/* Lesson pill with note gets slightly more padding */
+.lesson-pill.lesson-has-note {
+  padding: 0.5rem;
+}
+
 .lesson-pill-content {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.25rem;
   width: 100%;
   padding-right: 0;
   transition: padding-right 0.5s ease;
 }
 
+/* Main info (time and student) */
+.lesson-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
 .lesson-time {
   font-weight: 600;
-  font-size: 0.7rem;
+  font-size: clamp(0.6rem, 0.65vw + 0.5rem, 0.7rem);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .lesson-student {
-  font-size: 0.7rem;
+  font-size: clamp(0.6rem, 0.65vw + 0.5rem, 0.7rem);
   opacity: 0.9;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Note display inside the pill */
+.lesson-note {
+  display: flex;
+  align-items: flex-start;
+  margin-top: 0.125rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: clamp(0.55rem, 0.6vw + 0.45rem, 0.65rem);
+  line-height: 1.4;
+  opacity: 0.95;
+}
+
+.lesson-note-text {
+  flex: 1;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  /* Limit to 3 lines on desktop */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Action buttons */
 .lesson-pill-actions {
   position: absolute;
   top: 0;
@@ -265,45 +280,19 @@
   align-items: center;
   justify-content: center;
   transition: background-color 0.5s ease;
+  cursor: pointer;
 }
 
 .lesson-action-btn:hover {
   background-color: rgba(255, 255, 255, 0.3);
 }
 
+.lesson-action-btn:active {
+  transform: scale(0.95);
+}
+
 .lesson-delete-btn:hover {
   background-color: var(--error);
-}
-
-.lesson-has-note {
-  position: relative;
-}
-
-.lesson-note-tooltip {
-  position: absolute;
-  bottom: calc(100% + 0.5rem);
-  left: 50%;
-  transform: translateX(-50%) translateY(10px);
-  background-color: var(--surface);
-  color: var(--text-primary);
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  font-size: 0.7rem;
-  line-height: 1.4;
-  white-space: pre-wrap;
-  width: 100%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 1px solid var(--border);
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.5s ease;
-  z-index: 1000;
-}
-
-.lesson-pill:hover .lesson-note-tooltip {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-  pointer-events: auto;
 }
 
 .lesson-note-field {
@@ -316,11 +305,79 @@
 }
 
 /* Responsive Design */
+
+/* Tablet and below */
+@media (max-width: 1024px) {
+  .calendar-container {
+    padding: 1.5rem 0;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .calendar-grid {
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
+  }
+
+  .calendar-day {
+    min-height: 120px;
+  }
+
+  .calendar-nav h3 {
+    font-size: 1.125rem;
+  }
+}
+
+/* Mobile and small tablets */
 @media (max-width: 768px) {
+  .calendar-container {
+    padding: 1rem 0;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
   .calendar-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .calendar-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .calendar-subtitle {
+    font-size: 0.8125rem;
+  }
+
+  .calendar-nav {
+    margin-bottom: 1rem;
+  }
+
+  .calendar-nav h3 {
+    font-size: 1rem;
+  }
+
+  .calendar-nav .btn {
+    padding: 0.5rem;
+    min-width: auto;
+  }
+
+  .calendar-nav .btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .calendar-grid {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    border-radius: var(--radius-sm);
+  }
+
+  .calendar-weekday {
+    font-size: 0.65rem;
+    padding: 0.5rem 0.25rem;
+    font-weight: 600;
   }
 
   .calendar-day {
@@ -329,40 +386,166 @@
   }
 
   .day-number {
-    font-size: 0.75rem;
+    font-size: clamp(0.65rem, 0.7vw + 0.5rem, 0.75rem);
+    margin-bottom: 0.125rem;
+  }
+
+  .day-lessons {
+    gap: 0.125rem;
+    margin-top: 0.125rem;
   }
 
   .lesson-pill {
     padding: 0.25rem 0.375rem;
+    font-size: clamp(0.6rem, 0.65vw + 0.5rem, 0.7rem);
+  }
+
+  .lesson-pill.lesson-has-note {
+    padding: 0.375rem;
   }
 
   .lesson-time,
   .lesson-student {
-    font-size: 0.65rem;
+    font-size: clamp(0.55rem, 0.6vw + 0.45rem, 0.65rem);
+  }
+
+  /* Note styling for mobile */
+  .lesson-note {
+    padding-top: 0.3rem;
+    margin-top: 0.1rem;
+    font-size: clamp(0.5rem, 0.55vw + 0.4rem, 0.6rem);
+  }
+
+  .lesson-note-text {
+    /* Limit to 2 lines on mobile */
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.3;
   }
 
   .lesson-pill-actions {
-    opacity: 1;
+    display: none;
   }
 
-  .calendar-weekday {
+  .lesson-pill:hover .lesson-pill-content {
+    padding-right: 0;
+  }
+
+  .lesson-action-btn {
+    padding: 0.2rem;
+  }
+
+  .empty-day-hint {
     font-size: 0.65rem;
-    padding: 0.5rem;
   }
 }
 
+/* Small mobile */
 @media (max-width: 480px) {
+  .calendar-container {
+    padding: 0.75rem 0;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .calendar-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .calendar-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .calendar-nav {
+    margin-bottom: 0.75rem;
+  }
+
+  .calendar-nav h3 {
+    font-size: 0.9375rem;
+  }
+
+  .calendar-nav .btn {
+    padding: 0.375rem;
+    min-width: auto;
+  }
+
+  .calendar-nav .btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
   .calendar-weekday {
     font-size: 0.6rem;
-    padding: 0.375rem;
+    padding: 0.375rem 0.125rem;
   }
 
   .calendar-day {
     min-height: 60px;
+    padding: 0.125rem;
+  }
+
+  .day-number {
+    font-size: clamp(0.6rem, 0.65vw + 0.45rem, 0.7rem);
+    margin-bottom: 0.125rem;
+  }
+
+  .day-lessons {
+    gap: 0.125rem;
   }
 
   .lesson-pill {
-    font-size: 0.65rem;
+    padding: 0.2rem 0.25rem;
+    font-size: clamp(0.55rem, 0.6vw + 0.4rem, 0.65rem);
+    border-radius: 2px;
+  }
+
+  .lesson-pill.lesson-has-note {
+    padding: 0.25rem;
+  }
+
+  .lesson-time,
+  .lesson-student {
+    font-size: clamp(0.5rem, 0.55vw + 0.35rem, 0.6rem);
+  }
+
+  .lesson-pill-content {
+    gap: 0.15rem;
+  }
+
+  /* Note styling for small mobile */
+  .lesson-note {
+    padding-top: 0.25rem;
+    margin-top: 0.1rem;
+    font-size: clamp(0.45rem, 0.5vw + 0.3rem, 0.55rem);
+    border-top-width: 0.5px;
+  }
+
+  .lesson-note-text {
+    /* Limit to 2 lines on small mobile */
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.3;
+  }
+
+  .lesson-pill:hover .lesson-pill-content {
+    padding-right: 0;
+  }
+
+  .lesson-action-btn {
+    padding: 0.15rem;
+  }
+
+  .lesson-action-btn svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .lesson-pill-actions {
+    display: none;
+  }
+
+  .empty-day-hint {
+    font-size: 0.6rem;
   }
 }
 
@@ -610,5 +793,49 @@
   .recurring-edit-modal {
     max-width: 100%;
   }
+}
+
+/* Lesson Action Modal */
+.lesson-action-modal {
+  max-width: 400px;
+}
+
+.lesson-action-info {
+  margin-bottom: 1.5rem;
+}
+
+.lesson-action-student {
+  font-size: 1.375rem;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.lesson-action-student strong {
+  font-weight: 700;
+}
+
+.lesson-action-note {
+  padding: 0.75rem;
+  background-color: var(--surface);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.lesson-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lesson-action-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
 }
 

@@ -55,6 +55,12 @@ export function useCalendar() {
   const [showRecurringEditModal, setShowRecurringEditModal] = useState(false);
   const [recurringEditScope, setRecurringEditScope] = useState<'single' | 'future' | null>(null);
   const [recurringAction, setRecurringAction] = useState<'edit' | 'delete' | null>(null);
+  
+  // Confirmation modal state
+  const [showConfirmDiscard, setShowConfirmDiscard] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [pendingDeleteLesson, setPendingDeleteLesson] = useState<Lesson | null>(null);
+  const [pendingDeleteScope, setPendingDeleteScope] = useState<'single' | 'future' | null>(null);
 
   // ============================================================================
   // Data Fetching
@@ -279,11 +285,11 @@ export function useCalendar() {
   // ============================================================================
 
   /**
-   * Deletes a lesson after confirmation
-   * For recurring lessons, shows modal to choose delete scope
+   * Request to delete a lesson - shows confirmation modal
+   * For recurring lessons, shows modal to choose delete scope first
    */
-  const handleDelete = async (lesson: Lesson) => {
-    // For recurring lessons, show scope selection modal
+  const handleDelete = (lesson: Lesson) => {
+    // For recurring lessons, show scope selection modal first
     if (lesson.recurrence_rule) {
       setEditingLesson(lesson);
       setRecurringAction('delete');
@@ -291,52 +297,61 @@ export function useCalendar() {
       return;
     }
 
-    // Simple delete for non-recurring lessons
-    if (!confirm('Are you sure you want to delete this lesson?')) {
-      return;
-    }
+    // Simple delete for non-recurring lessons - show confirmation modal
+    setPendingDeleteLesson(lesson);
+    setPendingDeleteScope(null);
+    setShowConfirmDelete(true);
+  };
+
+  /**
+   * Confirm delete lesson (after scope is determined for recurring)
+   */
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteLesson) return;
 
     try {
-      await lessonService.deleteLesson(lesson.id);
+      if (pendingDeleteScope === 'single') {
+        await lessonService.deleteSingleOccurrence(pendingDeleteLesson);
+      } else if (pendingDeleteScope === 'future') {
+        await lessonService.deleteFutureOccurrences(pendingDeleteLesson);
+      } else {
+        // Non-recurring lesson
+        await lessonService.deleteLesson(pendingDeleteLesson.id);
+      }
+
       fetchData();
+      setShowConfirmDelete(false);
+      setPendingDeleteLesson(null);
+      setPendingDeleteScope(null);
+      resetRecurringState();
     } catch (error) {
       console.error('Error deleting lesson:', error);
       alert('Failed to delete lesson');
+      setShowConfirmDelete(false);
+      setPendingDeleteLesson(null);
+      setPendingDeleteScope(null);
+      resetRecurringState();
     }
   };
 
   /**
    * Performs the actual delete after scope is determined for recurring lessons
+   * Now shows confirmation modal instead of browser confirm
    */
-  const performDelete = async () => {
+  const performDelete = () => {
     if (!editingLesson) return;
 
-    if (!confirm('Are you sure you want to delete this lesson?')) {
-      resetRecurringState();
-      return;
-    }
-
-    try {
-      if (recurringEditScope === 'single') {
-        await lessonService.deleteSingleOccurrence(editingLesson);
-      } else if (recurringEditScope === 'future') {
-        await lessonService.deleteFutureOccurrences(editingLesson);
-      }
-
-      fetchData();
-      resetRecurringState();
-      resetForm();
-    } catch (error) {
-      console.error('Error deleting lesson:', error);
-      alert('Failed to delete lesson');
-      resetRecurringState();
-    }
+    // Set up pending delete and show confirmation modal
+    setPendingDeleteLesson(editingLesson);
+    setPendingDeleteScope(recurringEditScope);
+    setShowConfirmDelete(true);
+    resetRecurringState(); // Close the recurring edit modal
   };
 
   // ============================================================================
   // Toggle Paid Handler - REMOVED
   // ============================================================================
-  
+
   /**
    * NOTE: Paid status is no longer tracked on lessons.
    * It's now determined by payment_items linking lessons to payments.
@@ -352,7 +367,18 @@ export function useCalendar() {
    * Returns true if any field has changed
    */
   const hasFormChanged = (): boolean => {
-    if (!originalFormData) return true; // New lesson, always allow submit
+    if (!originalFormData) {
+      // New lesson - check if user has actually entered data beyond initial state
+      // Initial state: date might be set from clicking calendar, duration defaults to '60'
+      // Only show warning if user has entered student, time, or changed duration/note
+      const hasStudent = !!formData.student_id;
+      const hasTime = !!formData.time;
+      const hasNote = !!formData.note;
+      const durationChanged = formData.duration !== '60';
+      const isRecurringChanged = isRecurring; // If recurring is checked, user made a change
+      
+      return hasStudent || hasTime || hasNote || durationChanged || isRecurringChanged;
+    }
     
     return (
       formData.student_id !== originalFormData.student_id ||
@@ -362,6 +388,26 @@ export function useCalendar() {
       formData.recurrence_rule !== originalFormData.recurrence_rule ||
       formData.note !== originalFormData.note
     );
+  };
+
+  /**
+   * Request to close modal - shows confirmation if there are unsaved changes
+   */
+  const handleRequestClose = () => {
+    if (hasFormChanged()) {
+      setShowForm(false); // Hide form first, then show confirmation
+      setShowConfirmDiscard(true);
+    } else {
+      resetForm();
+    }
+  };
+
+  /**
+   * Confirm discard changes
+   */
+  const handleConfirmDiscard = () => {
+    resetForm();
+    setShowConfirmDiscard(false);
   };
 
   /**
@@ -395,10 +441,16 @@ export function useCalendar() {
    * Opens the form with a pre-selected date
    */
   const handleDateClick = (date: Date) => {
-    setFormData({
-      ...formData,
+    const initialFormData: LessonFormData = {
+      student_id: '',
       date: format(date, 'yyyy-MM-dd'),
-    });
+      time: '',
+      duration: '60',
+      recurrence_rule: null,
+      note: null,
+    };
+    setFormData(initialFormData);
+    setOriginalFormData(null); // Clear original since this is a new lesson
     setShowForm(true);
   };
 
@@ -452,6 +504,9 @@ export function useCalendar() {
     handleSubmit,
     handleEdit,
     handleDelete,
+    handleRequestClose,
+    handleConfirmDiscard,
+    handleConfirmDelete,
     resetForm,
     handleDateClick,
     updateFormData,
@@ -461,5 +516,11 @@ export function useCalendar() {
 
     // Form validation
     hasFormChanged,
+    
+    // Confirmation modals
+    showConfirmDiscard,
+    showConfirmDelete,
+    setShowConfirmDiscard,
+    setShowConfirmDelete,
   };
 }
