@@ -106,12 +106,27 @@ function expandRecurringLessons(
     if (lesson.recurrence_rule) {
       // Recurring lesson - generate occurrences
       try {
+        // Extract local time components
+        const originalLessonDate = new Date(lesson.date);
+        const originalHours = originalLessonDate.getHours();
+        const originalMinutes = originalLessonDate.getMinutes();
+        const originalSeconds = originalLessonDate.getSeconds();
+        const originalMilliseconds = originalLessonDate.getMilliseconds();
+        
         const rrule = rrulestr(lesson.recurrence_rule);
         const occurrences = rrule.between(monthStart, monthEnd, true);
 
         for (const occurrence of occurrences) {
-          const occurrenceDate = occurrence.toISOString();
-          console.log(occurrenceDate)
+          // set occurrence to local time to prevent DST changes
+          const occurrenceWithOriginalTime = new Date(occurrence);
+          occurrenceWithOriginalTime.setHours(
+            originalHours,
+            originalMinutes,
+            originalSeconds,
+            originalMilliseconds
+          );
+          
+          const occurrenceDate = occurrenceWithOriginalTime.toISOString();
           const occurrenceKey = `${lesson.id}-${occurrenceDate}`;
           
           // Get note for this occurrence from noteMap, fallback to lesson.note for backwards compatibility

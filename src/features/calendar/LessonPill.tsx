@@ -28,7 +28,7 @@ export default function LessonPill({
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     // On mobile, show modal instead of individual button actions
-    // Only trigger if we're on mobile (screen width <= 768px)
+    // Only trigger if on mobile (screen width <= 768px)
     if (onMobileClick && window.innerWidth <= 768) {
       onMobileClick();
     }
