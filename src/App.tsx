@@ -1,8 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Music, Users, CalendarDays, DollarSign } from 'lucide-react';
-import Students from './components/students';
-import Calendar from './components/calendar';
-import Payments from './components/payments';
+import Students from './features/students';
+import Calendar from './features/calendar';
+import Payments from './features/payments';
 import './App.css';
 
 function AppContent() {

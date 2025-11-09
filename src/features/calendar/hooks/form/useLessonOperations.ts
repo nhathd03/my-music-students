@@ -1,0 +1,58 @@
+import type { Lesson } from "../../../../types/database";
+import type { LessonInsertData } from "../../services/lesson";
+import * as lessonService from "../../services/lesson" 
+
+export function useLessonOperations() {
+  
+  const createLesson = async (lessonData: LessonInsertData) => {
+    try {
+      await lessonService.createLesson(lessonData);
+      return { success: true };
+    } catch (error) {
+      console.error('Error creating lesson:', error);
+      return { success: false, error };
+    }
+  };
+
+  const updateLesson = async (
+    lesson: Lesson,
+    lessonData: LessonInsertData,
+    scope?: 'single' | 'future'
+  ) => {
+    try {
+      if (lesson.recurrence_rule && scope === 'single') {
+        await lessonService.updateSingleOccurrence(lesson, lesson.date, lessonData);
+      } else if (lesson.recurrence_rule && scope === 'future') {
+        await lessonService.updateCurrentAndFutureOccurrences(lesson, lessonData);
+      } else {
+        await lessonService.updateLesson(lesson.id, lessonData);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating lesson:', error);
+      return { success: false, error };
+    }
+  };
+
+  const deleteLesson = async (
+    lesson: Lesson,
+    scope?: 'single' | 'future'
+  ) => {
+    try {
+      if (scope === 'single') {
+        await lessonService.deleteSingleOccurrence(lesson);
+      } else if (scope === 'future') {
+          console.log("deleting future occurrence 1 - operatione")
+        await lessonService.deleteFutureOccurrences(lesson);
+      } else {
+        await lessonService.deleteLesson(lesson.id);
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting lesson:', error);
+      return { success: false, error };
+    }
+  };
+
+  return { createLesson, updateLesson, deleteLesson };
+}
