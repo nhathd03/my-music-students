@@ -21,7 +21,7 @@ export function useLessonOperations() {
   ) => {
     try {
       if (lesson.recurrence_rule && scope === 'single') {
-        await lessonService.updateSingleOccurrence(lesson, lesson.date, lessonData);
+        await lessonService.updateSingleOccurrence(lesson, lessonData);
       } else if (lesson.recurrence_rule && scope === 'future') {
         await lessonService.updateCurrentAndFutureOccurrences(lesson, lessonData);
       } else {
@@ -42,7 +42,6 @@ export function useLessonOperations() {
       if (scope === 'single') {
         await lessonService.deleteSingleOccurrence(lesson);
       } else if (scope === 'future') {
-          console.log("deleting future occurrence 1 - operatione")
         await lessonService.deleteFutureOccurrences(lesson);
       } else {
         await lessonService.deleteLesson(lesson.id);

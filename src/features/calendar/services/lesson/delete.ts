@@ -2,6 +2,12 @@ import { RRule, rrulestr } from 'rrule';
 import { supabase } from '../../../../lib/supabase';
 import type { Lesson } from '../../../../types/database';
 import type { LessonInsertData } from './types';
+import { format } from 'date-fns';
+import { createLesson } from './create';
+
+const formatDate = (date: Date): string => {
+  return format(date, 'yyyy-MM-dd');
+}
 
 /**
  * Deletes a non-recurring lesson
@@ -15,7 +21,6 @@ export async function deleteLesson(lessonId: number): Promise<void> {
  * Deletes all future occurrences of a recurring lesson (including the current one)
  */
 export async function deleteFutureOccurrences(lesson: Lesson): Promise<void> {
-  const lessonDate = new Date(lesson.date);
 
   // Fetch original lesson
   const { data: originalLesson, error } = await supabase
@@ -26,23 +31,17 @@ export async function deleteFutureOccurrences(lesson: Lesson): Promise<void> {
 
   if (error) throw error;
 
-  if (!originalLesson.recurrence_rule) {
-    // Not recurring - just delete it
-    await deleteLesson(lesson.id);
-    return;
-  }
-
   const rrule = rrulestr(originalLesson.recurrence_rule);
   const startDate = new Date(originalLesson.date);
   
   // If this is the first occurrence, delete the entire lesson
-  if (lessonDate.toISOString() === startDate.toISOString()) {
+  if (lesson.date === formatDate(startDate)) {
     await deleteLesson(lesson.id);
     return;
   }
 
   // Truncate to end before this occurrence
-  const untilDate = new Date(lessonDate);
+  const untilDate = new Date(`${lesson.date}T${lesson.time}`);
   untilDate.setDate(untilDate.getDate() - 1);
   untilDate.setHours(23, 59, 59, 999);
 
@@ -62,7 +61,7 @@ export async function deleteFutureOccurrences(lesson: Lesson): Promise<void> {
       .from('lesson')
       .update({ 
         recurrence_rule: null,
-        date: remainingOccurrences[0].toISOString()
+        date: formatDate(remainingOccurrences[0])
       })
       .eq('id', lesson.id);
   } else {
@@ -73,7 +72,6 @@ export async function deleteFutureOccurrences(lesson: Lesson): Promise<void> {
       .eq('id', lesson.id);
   }
 
-  console.log(`Deleted future occurrences from ${lessonDate.toISOString()}`);
 }
 
 /**
@@ -95,7 +93,6 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
 
   const rrule = rrulestr(originalLesson.recurrence_rule);
   const startDate = new Date(originalLesson.date);
-  const lessonDate = new Date(lesson.date);
   
   // Generate all occurrences
   const endDate = rrule.options.until 
@@ -105,7 +102,7 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
   const allOccurrences = rrule.between(startDate, endDate, true);
 
   const currentIndex = allOccurrences.findIndex(
-    occ => occ.toISOString() === lesson.date
+    occ => formatDate(occ) === lesson.date
   );
 
   if (currentIndex === -1) {
@@ -128,78 +125,52 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
       .from('lesson')
       .update({ 
         recurrence_rule: null,
-        date: remainingOccurrence.toISOString()
+        date: formatDate(remainingOccurrence)
       })
       .eq('id', lesson.id);
 
-    console.log(`Converted to single lesson - only 2 occurrences existed`);
     return;
   }
 
   // First occurrence - truncate from start
   if (currentIndex === 0) {
     const nextOccurrence = allOccurrences[1];
-    const afterOccurrences = allOccurrences.slice(1);
+ 
+    // Update to start from next occurrence
+    const newRule = new RRule({
+      ...rrule.options,
+      dtstart: nextOccurrence,
+    });
 
-    if (afterOccurrences.length === 1) {
-      // Only one left - convert to single
-      await supabase
-        .from('lesson')
-        .update({ 
-          recurrence_rule: null,
-          date: nextOccurrence.toISOString()
-        })
-        .eq('id', lesson.id);
-    } else {
-      // Update to start from next occurrence
-      const newRule = new RRule({
-        ...rrule.options,
-        dtstart: nextOccurrence,
-      });
-
-      await supabase
-        .from('lesson')
-        .update({ 
-          date: nextOccurrence.toISOString(),
-          recurrence_rule: newRule.toString()
-        })
-        .eq('id', lesson.id);
-    }
-
-    console.log(`Deleted first occurrence, series continues from ${nextOccurrence.toISOString()}`);
+    await supabase
+      .from('lesson')
+      .update({ 
+        date: formatDate(nextOccurrence),
+        recurrence_rule: newRule.toString()
+      })
+      .eq('id', lesson.id);
+  
     return;
   }
 
   // Last occurrence - truncate at end
   if (currentIndex === allOccurrences.length - 1) {
-    const beforeOccurrences = allOccurrences.slice(0, currentIndex);
-    const untilDate = new Date(lessonDate);
+    const untilDate = new Date(`${lesson.date}T${lesson.time}`);
     untilDate.setDate(untilDate.getDate() - 1);
     untilDate.setHours(23, 59, 59, 999);
 
-    if (beforeOccurrences.length === 1) {
-      // Only one left - convert to single
-      await supabase
-        .from('lesson')
-        .update({ 
-          recurrence_rule: null,
-          date: beforeOccurrences[0].toISOString()
-        })
-        .eq('id', lesson.id);
-    } else {
-      // Truncate the series
-      const truncatedRule = new RRule({
-        ...rrule.options,
-        until: untilDate,
-      });
+    // Truncate the series
+    const truncatedRule = new RRule({
+      ...rrule.options,
+      until: untilDate,
+    });
 
-      await supabase
-        .from('lesson')
-        .update({ recurrence_rule: truncatedRule.toString() })
-        .eq('id', lesson.id);
-    }
+    await supabase
+      .from('lesson')
+      .update({ recurrence_rule: truncatedRule.toString() })
+      .eq('id', lesson.id);
+  
 
-    console.log(`Deleted last occurrence, series ends at ${untilDate.toISOString()}`);
     return;
   }
 
@@ -208,7 +179,7 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
   const afterOccurrences = allOccurrences.slice(currentIndex + 1);
 
   // Truncate original to end before this occurrence
-  const untilDate = new Date(lessonDate);
+  const untilDate = new Date(`${lesson.date}T${lesson.time}`);
   untilDate.setDate(untilDate.getDate() - 1);
   untilDate.setHours(23, 59, 59, 999);
 
@@ -218,7 +189,7 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
       .from('lesson')
       .update({ 
         recurrence_rule: null,
-        date: beforeOccurrences[0].toISOString()
+        date: formatDate(beforeOccurrences[0])
       })
       .eq('id', lesson.id);
   } else {
@@ -241,13 +212,14 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
     // Create single lesson
     const singleLessonData: LessonInsertData = {
       student_id: originalLesson.student_id,
-      date: nextOccurrence.toISOString(),
+      date: formatDate(nextOccurrence),
+      time: originalLesson.time,
       duration: originalLesson.duration,
       note: originalLesson.note,
       recurrence_rule: null,
     };
 
-    await supabase.from('lesson').insert([singleLessonData]);
+    await createLesson(singleLessonData);
   } else {
     // Create new recurring series
     const newRule = new RRule({
@@ -257,14 +229,14 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
 
     const newSeriesData: LessonInsertData = {
       student_id: originalLesson.student_id,
-      date: nextOccurrence.toISOString(),
+      date: formatDate(nextOccurrence),
+      time: originalLesson.time,
       duration: originalLesson.duration,
       note: originalLesson.note,
       recurrence_rule: newRule.toString(),
     };
 
-    await supabase.from('lesson').insert([newSeriesData]);
+    await createLesson(newSeriesData);
   }
 
-  console.log(`Split series: before=${beforeOccurrences.length}, deleted=1, after=${afterOccurrences.length}`);
 }

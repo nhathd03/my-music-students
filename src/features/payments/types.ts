@@ -58,8 +58,8 @@ export interface PaymentSummaryProps {
 export interface PaymentFilters {
   studentSearch: string;  // Search query for student name
   studentId: string;      // Selected student ID (or 'all')
-  dateFrom: string;        // Filter payments from this date (YYYY-MM-DD)
-  dateTo: string;          // Filter payments until this date (YYYY-MM-DD)
+  dateFrom: string;        // Filter payments from this date (yyyy-MM-dd)
+  dateTo: string;          // Filter payments until this date (yyyy-MM-dd)
   method: string;          // Payment method filter (or 'all')
   amountMin: string;       // Minimum amount
   amountMax: string;       // Maximum amount

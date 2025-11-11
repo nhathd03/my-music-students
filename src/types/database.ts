@@ -43,6 +43,7 @@ export interface Student {
 export interface Lesson {
   id: number;
   date: string;
+  time: string;
   duration: number;
   student_id: number;
   recurrence_rule: string | null;

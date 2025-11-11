@@ -4,8 +4,6 @@ import * as lessonNoteService from './notes';
 
 /**
  * Creates a new lesson
- * For recurring lessons, notes go in lesson.note (for default note)
- * For non-recurring lessons, notes go in lesson_note table
  */
 export async function createLesson(lessonData: LessonInsertData): Promise<void> {
   // Separate note from lessonData

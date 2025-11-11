@@ -12,17 +12,31 @@ import { useLessonOperations } from "./useLessonOperations";
 import { parseRRule } from "../../utils/rruleUtils";
 import { RRule } from "rrule";
 
+/**
+ * Checks if a recurring lesson has future occurrences
+ * Returns false for non-recurring lessons or if there are no future occurrences
+ */
 const hasFutureOccurrences = (lesson: Lesson) => {
-    if (!lesson.recurrence_rule) return true;
+    // Non-recurring lessons don't have "future occurrences" in the series sense
+    if (!lesson.recurrence_rule) return false;
     
-    const parsed = parseRRule(lesson.recurrence_rule);
-    if (!parsed?.untilDate && !parsed?.occurrenceCount && !parsed?.endType) return false;
-
-    const rule = RRule.fromString(lesson.recurrence_rule);
-    
-    if (rule.after(new Date(lesson.date))) return true;
-    
-    return false;
+    try {
+        const parsed = parseRRule(lesson.recurrence_rule);
+        if (!parsed) return false;
+        
+        // If endType is 'never', there are always future occurrences (infinite series)
+        if (parsed.endType === 'never') return true;
+        
+        // Check if there's an occurrence after the current lesson date
+        const rule = RRule.fromString(lesson.recurrence_rule);
+        const currentDate = new Date(lesson.date);
+        const nextOccurrence = rule.after(currentDate);
+        
+        return nextOccurrence !== null;
+    } catch (error) {
+        console.error('Error checking future occurrences:', error);
+        return false;
+    }
 }
 
 export function useLessonFormActions(  
@@ -118,14 +132,11 @@ export function useLessonFormActions(
     };
 
     const performSubmit = async () => {
-        const [year, month, day] = formState.formData.date.split('-').map(Number);
-        const [hours, minutes] = formState.formData.time.split(':').map(Number);
-        
-        const lessonDateTimeLocal = new Date(year, month - 1, day, hours, minutes);
         
         const lessonData: lessonService.LessonInsertData = {
             student_id: parseInt(formState.formData.student_id),
-            date: lessonDateTimeLocal.toISOString(),
+            date: formState.formData.date,
+            time: formState.formData.time,
             duration: parseInt(formState.formData.duration),
         };
         
@@ -170,7 +181,6 @@ export function useLessonFormActions(
         };
 
         formState.loadFormData(initialFormData, lesson);
-            console.log(initialFormData)
     };
 
     const handleDelete = (lesson: Lesson) => {

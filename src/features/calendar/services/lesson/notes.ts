@@ -18,7 +18,7 @@ export async function upsertLessonNote(
     .upsert(
       {
         lesson_id: lessonId,
-        lesson_date: new Date(lessonDate).toISOString(),
+        lesson_date: lessonDate,
         note: note.trim(),
       },
       {
@@ -40,7 +40,7 @@ export async function deleteLessonNote(
     .from('lesson_note')
     .delete()
     .eq('lesson_id', lessonId)
-    .eq('lesson_date', new Date(lessonDate).toISOString());
+    .eq('lesson_date', lessonDate);
 
   if (error) throw error;
 }

@@ -1,4 +1,4 @@
-import { startOfMonth, endOfMonth } from 'date-fns';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { rrulestr } from 'rrule';
 import { supabase } from '../../../../lib/supabase';
 import type { Student } from '../../../../types/database';
@@ -52,7 +52,7 @@ export async function fetchLessonsForMonth(
   // Create a Set of paid lesson occurrences (lesson_id + date)
   const paidOccurrences = new Set(
     (paymentItems || []).map(item => 
-      `${item.lesson_id}-${new Date(item.lesson_date).toISOString()}`
+      `${item.lesson_id}-${item.lesson_date}`
     )
   );
 
@@ -67,7 +67,7 @@ export async function fetchLessonsForMonth(
   // Create a Map of lesson notes (lesson_id + date) -> note
   const noteMap = new Map<string, string>();
   (lessonNotes || []).forEach(note => {
-    const key = `${note.lesson_id}-${new Date(note.lesson_date).toISOString()}`;
+    const key = `${note.lesson_id}-${note.lesson_date}`;
     noteMap.set(key, note.note);
   });
 
@@ -106,27 +106,13 @@ function expandRecurringLessons(
     if (lesson.recurrence_rule) {
       // Recurring lesson - generate occurrences
       try {
-        // Extract local time components
-        const originalLessonDate = new Date(lesson.date);
-        const originalHours = originalLessonDate.getHours();
-        const originalMinutes = originalLessonDate.getMinutes();
-        const originalSeconds = originalLessonDate.getSeconds();
-        const originalMilliseconds = originalLessonDate.getMilliseconds();
-        
         const rrule = rrulestr(lesson.recurrence_rule);
         const occurrences = rrule.between(monthStart, monthEnd, true);
 
         for (const occurrence of occurrences) {
           // set occurrence to local time to prevent DST changes
-          const occurrenceWithOriginalTime = new Date(occurrence);
-          occurrenceWithOriginalTime.setHours(
-            originalHours,
-            originalMinutes,
-            originalSeconds,
-            originalMilliseconds
-          );
           
-          const occurrenceDate = occurrenceWithOriginalTime.toISOString();
+          const occurrenceDate = format(new Date(occurrence), 'yyyy-MM-dd')
           const occurrenceKey = `${lesson.id}-${occurrenceDate}`;
           
           // Get note for this occurrence from noteMap, fallback to lesson.note for backwards compatibility
@@ -145,17 +131,16 @@ function expandRecurringLessons(
       }
     } else {
       // Non-recurring lesson - include if within month range
-      const lessonDate = new Date(lesson.date);
+      const lessonDate = new Date(`${lesson.date}T${lesson.time}`);
       if (lessonDate >= monthStart && lessonDate <= monthEnd) {
-        const occurrenceDateISO = new Date(lesson.date).toISOString();
-        const occurrenceKey = `${lesson.id}-${occurrenceDateISO}`;
+        const occurrenceKey = `${lesson.id}-${lesson.date}`;
         
         // Get note for this occurrence from noteMap, fallback to lesson.note
         const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
         
         result.push({
           ...lesson,
-          date: occurrenceDateISO,
+          date: lesson.date,
           paid: paidOccurrences.has(occurrenceKey),
           note: occurrenceNote,
         });

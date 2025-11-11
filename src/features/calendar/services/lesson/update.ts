@@ -3,15 +3,25 @@ import { supabase } from '../../../../lib/supabase';
 import type { Lesson } from '../../../../types/database';
 import type { LessonInsertData } from './types';
 import * as lessonNoteService from './notes';
+import { format } from 'date-fns';
+import { createLesson } from './create';
+
+const formatDate = (date: Date): string => {
+  return format(date, 'yyyy-MM-dd');
+}
+
+const findOccurrenceIndex = (occurrences: Date[], target: string): number => {
+  return occurrences.findIndex(
+    occ => formatDate(occ) === target
+  )
+}
 
 /**
  * Updates an existing lesson
- * For non-recurring lessons, notes go in lesson_note table
- * For recurring lessons, notes stay in lesson.note (default note)
  */
 export async function updateLesson(
   lessonId: number,
-  lessonData: Partial<LessonInsertData>
+  updatedData: LessonInsertData
 ): Promise<void> {
   // Fetch the lesson to check if it's recurring
   const { data: lesson, error: fetchError } = await supabase
@@ -23,8 +33,8 @@ export async function updateLesson(
   if (fetchError) throw fetchError;
   
   // Handle note separately
-  const note = lessonData.note;
-  const lessonDataWithoutNote = { ...lessonData };
+  const note = updatedData.note;
+  const lessonDataWithoutNote = { ...updatedData };
   delete lessonDataWithoutNote.note;
   
   if (note !== undefined) {
@@ -52,11 +62,12 @@ export async function updateLesson(
 
 /**
  * Updates a single occurrence of a recurring lesson by SPLITTING the series
+ * 
+
  */
 export async function updateSingleOccurrence(
   lesson: Lesson,
-  displayedDate: string,
-  updatedData: Partial<LessonInsertData>
+  updatedData: LessonInsertData
 ): Promise<void> {
   // Fetch the original lesson
   const { data: originalLesson, error: fetchError } = await supabase
@@ -67,15 +78,11 @@ export async function updateSingleOccurrence(
 
   if (fetchError) throw fetchError;
 
-  if (!originalLesson.recurrence_rule) {
-    // Not recurring - just update directly
-    await updateLesson(lesson.id, updatedData);
-    return;
-  }
-
-  const lessonDate = new Date(displayedDate);
+  /**
+   * find occurrence date
+   */
   const rrule = rrulestr(originalLesson.recurrence_rule);
-  const startDate = new Date(originalLesson.date);
+  const startDate = new Date(`${originalLesson.date}T${originalLesson.time}`);
   
   // Generate all occurrences
   const endDate = rrule.options.until 
@@ -84,10 +91,7 @@ export async function updateSingleOccurrence(
   
   const allOccurrences = rrule.between(startDate, endDate, true);
   
-  // Find this occurrence's index
-  const currentIndex = allOccurrences.findIndex(
-    occ => occ.toISOString() === displayedDate
-  );
+  const currentIndex = findOccurrenceIndex(allOccurrences, lesson.date);
 
   if (currentIndex === -1) {
     throw new Error('Occurrence not found in recurrence rule');
@@ -95,47 +99,17 @@ export async function updateSingleOccurrence(
 
   // CASE 1: First occurrence - split it out as a single lesson and create new series for the rest
   if (currentIndex === 0) {
+
+    //update lesson to be non recurring
+    await updateLesson(lesson.id, {
+      ...updatedData,
+      recurrence_rule: null
+    });
+
     // Get all occurrences after this one
     const afterOccurrences = allOccurrences.slice(1);
-    
-    if (afterOccurrences.length === 0) {
-      // No more occurrences - just update the original lesson to be non-recurring
-      await updateLesson(lesson.id, {
-        ...updatedData,
-        recurrence_rule: null,
-      });
-      return;
-    }
-    
-    // Delete the original recurring lesson
-    await supabase.from('lesson').delete().eq('id', lesson.id);
-    
-    // Create the edited first occurrence as a single lesson
-    const editedLessonData: LessonInsertData = {
-      student_id: originalLesson.student_id,
-      date: updatedData.date || displayedDate,
-      duration: updatedData.duration ?? originalLesson.duration,
-      note: null, // Notes go in lesson_note table now
-      recurrence_rule: null,
-    };
-    
-    const { data: insertedLesson, error: insertError } = await supabase
-      .from('lesson')
-      .insert([editedLessonData])
-      .select()
-      .single();
-    
-    if (insertError) throw insertError;
-    
-    // Save note to lesson_note table if provided
-    if (updatedData.note) {
-      await lessonNoteService.upsertLessonNote(
-        insertedLesson.id,
-        updatedData.date || displayedDate,
-        updatedData.note
-      );
-    }
-    
+    if (afterOccurrences.length === 0) return;
+
     // Create new series for remaining occurrences
     const nextOccurrence = afterOccurrences[0];
     
@@ -143,12 +117,15 @@ export async function updateSingleOccurrence(
       // Only one remaining - create as single lesson
       const singleLessonData: LessonInsertData = {
         student_id: originalLesson.student_id,
-        date: nextOccurrence.toISOString(),
+        date: formatDate(nextOccurrence),
+        time: originalLesson.time,
         duration: originalLesson.duration,
         note: originalLesson.note,
         recurrence_rule: null,
       };
-      await supabase.from('lesson').insert([singleLessonData]);
+
+      await createLesson(singleLessonData);
+
     } else {
       // Multiple remaining - create new recurring series
       const newSeriesRule = new RRule({
@@ -158,12 +135,14 @@ export async function updateSingleOccurrence(
       
       const newSeriesData: LessonInsertData = {
         student_id: originalLesson.student_id,
-        date: nextOccurrence.toISOString(),
+        date: formatDate(nextOccurrence),
+        time: originalLesson.time,
         duration: originalLesson.duration,
         note: originalLesson.note,
         recurrence_rule: newSeriesRule.toString(),
       };
-      await supabase.from('lesson').insert([newSeriesData]);
+
+      await createLesson(newSeriesData);
     }
     
     return;
@@ -182,52 +161,37 @@ export async function updateSingleOccurrence(
     await supabase
       .from('lesson')
       .update({ 
-        recurrence_rule: null,
-        date: beforeOccurrences[0].toISOString()
+        recurrence_rule: null
       })
       .eq('id', lesson.id);
   } else {
-    // Truncate the recurrence
-    const untilDate = new Date(lessonDate);
-    untilDate.setDate(untilDate.getDate() - 1);
-    untilDate.setHours(23, 59, 59, 999);
+      // Truncate the recurrence
+      const untilDate = new Date(`${originalLesson.date}T${originalLesson.time}`);
+      untilDate.setDate(untilDate.getDate() - 1);
+      untilDate.setHours(23, 59, 59, 999);
 
-    const truncatedRule = new RRule({
-      ...rrule.options,
-      until: untilDate,
-    });
+      const truncatedRule = new RRule({
+        ...rrule.options,
+        until: untilDate,
+      });
 
-    await supabase
-      .from('lesson')
-      .update({ recurrence_rule: truncatedRule.toString() })
-      .eq('id', lesson.id);
+      await supabase
+        .from('lesson')
+        .update({ recurrence_rule: truncatedRule.toString() })
+        .eq('id', lesson.id);
   }
 
   // Step 2: Create the edited occurrence as a single lesson
   const editedLessonData: LessonInsertData = {
     student_id: originalLesson.student_id,
-    date: updatedData.date || displayedDate,
+    date: updatedData.date || lesson.date,
+    time: updatedData.time || originalLesson.time,
     duration: updatedData.duration ?? originalLesson.duration,
-    note: null, // Notes go in lesson_note table now
-    recurrence_rule: null, // Single occurrence
+    note: updatedData.note ?? null, 
+    recurrence_rule: null, 
   };
 
-  const { data: insertedLesson, error: createError } = await supabase
-    .from('lesson')
-    .insert([editedLessonData])
-    .select()
-    .single();
-
-  if (createError) throw createError;
-  
-  // Save note to lesson_note table if provided
-  if (updatedData.note) {
-    await lessonNoteService.upsertLessonNote(
-      insertedLesson.id,
-      updatedData.date || displayedDate,
-      updatedData.note
-    );
-  }
+  await createLesson(editedLessonData);
 
   // Step 3: Create new series for occurrences AFTER this one (if any)
   const afterOccurrences = allOccurrences.slice(currentIndex + 1);
@@ -239,34 +203,34 @@ export async function updateSingleOccurrence(
       // Only one occurrence remaining - create as single lesson
       const singleLessonData: LessonInsertData = {
         student_id: originalLesson.student_id,
-        date: nextOccurrence.toISOString(),
+        date: formatDate(nextOccurrence),
+        time: originalLesson.time,
         duration: originalLesson.duration,
         note: originalLesson.note,
         recurrence_rule: null,
       };
 
-      await supabase.from('lesson').insert([singleLessonData]);
+      await createLesson(singleLessonData);
+
   } else {
       // Multiple occurrences - create new recurring series
       const newSeriesRule = new RRule({
         ...rrule.options,
         dtstart: nextOccurrence,
-        // Keep the original UNTIL if it exists
       });
 
       const newSeriesData: LessonInsertData = {
         student_id: originalLesson.student_id,
-        date: nextOccurrence.toISOString(),
+        date: formatDate(nextOccurrence),
+        time: originalLesson.time,
         duration: originalLesson.duration,
         note: originalLesson.note,
         recurrence_rule: newSeriesRule.toString(),
       };
 
-      await supabase.from('lesson').insert([newSeriesData]);
+      await createLesson(newSeriesData);
     }
   }
-  
-  console.log(`Split lesson ${lesson.id}: before=${beforeOccurrences.length}, edited=1, after=${afterOccurrences.length}`);
 }
 
 /**
@@ -274,9 +238,8 @@ export async function updateSingleOccurrence(
  */
 export async function updateCurrentAndFutureOccurrences(
   lesson: Lesson,
-  updatedData: Partial<LessonInsertData>
+  updatedData: LessonInsertData
 ): Promise<void> {
-  const displayedDateISO = new Date(lesson.date).toISOString();
 
   // Fetch original lesson
   const { data: originalLesson, error: fetchError } = await supabase
@@ -287,16 +250,9 @@ export async function updateCurrentAndFutureOccurrences(
 
   if (fetchError) throw fetchError;
 
-  if (!originalLesson.recurrence_rule) {
-    // Not recurring - just update directly
-    await updateLesson(lesson.id, updatedData);
-    return;
-  }
-
   // Parse the recurrence rule
   const oldRule = rrulestr(originalLesson.recurrence_rule);
-  const startDate = new Date(originalLesson.date);
-  const lessonDate = new Date(displayedDateISO);
+  const startDate = new Date(`${originalLesson.date}T${originalLesson.time}`);
 
   // Generate all occurrences
   const endDate = oldRule.options.until 
@@ -305,20 +261,11 @@ export async function updateCurrentAndFutureOccurrences(
   
   const allOccurrences = oldRule.between(startDate, endDate, true);
 
-  const currentIndex = allOccurrences.findIndex(
-    occ => occ.toISOString() === displayedDateISO
-  );
+  const currentIndex = findOccurrenceIndex(allOccurrences, lesson.date)
 
   // CASE 1: First occurrence - update the lesson directly
   if (currentIndex === 0) {
-    const updatePayload: any = {};
-    
-    if (updatedData.date !== undefined) updatePayload.date = updatedData.date;
-    if (updatedData.duration !== undefined) updatePayload.duration = updatedData.duration;
-    if (updatedData.note !== undefined) updatePayload.note = updatedData.note;
-    if (updatedData.recurrence_rule !== undefined) updatePayload.recurrence_rule = updatedData.recurrence_rule;
-
-    await updateLesson(lesson.id, updatePayload);
+    await updateLesson(lesson.id, updatedData);
     return;
   }
 
@@ -326,7 +273,7 @@ export async function updateCurrentAndFutureOccurrences(
   
   // Step 1: Truncate the original lesson to end before this occurrence
   const beforeOccurrences = allOccurrences.slice(0, currentIndex);
-  const untilDate = new Date(lessonDate);
+  const untilDate = new Date(`${lesson.date}T${lesson.time}`);
   untilDate.setDate(untilDate.getDate() - 1);
   untilDate.setHours(23, 59, 59, 999);
 
@@ -338,8 +285,7 @@ export async function updateCurrentAndFutureOccurrences(
     await supabase
       .from('lesson')
       .update({ 
-        recurrence_rule: null,
-        date: beforeOccurrences[0].toISOString()
+        recurrence_rule: null
       })
       .eq('id', lesson.id);
   } else {
@@ -358,13 +304,12 @@ export async function updateCurrentAndFutureOccurrences(
   // Step 2: Create new lesson with updated data starting from this occurrence
   const newLessonData: LessonInsertData = {
     student_id: originalLesson.student_id,
-    date: updatedData.date || displayedDateISO,
+    date: updatedData.date || lesson.date,
+    time: updatedData.time || originalLesson.time,
     duration: updatedData.duration ?? originalLesson.duration,
     note: updatedData.note ?? originalLesson.note,
     recurrence_rule: updatedData.recurrence_rule ?? originalLesson.recurrence_rule,
   };
 
-  await supabase.from('lesson').insert([newLessonData]);
-
-  console.log(`Split lesson ${lesson.id}: truncated at ${untilDate.toISOString()}, created new series`);
+  await createLesson(newLessonData);
   }
