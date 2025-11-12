@@ -29,7 +29,7 @@ export default function LessonActionModal({
       <div className="modal-content lesson-action-modal" onClick={(e) => e.stopPropagation()}>
         <div className="card">
           <div className="modal-header">
-            <h3>{format(new Date(lesson.date), 'MMM d, yyyy')} - {format(new Date(lesson.date), 'h:mm a')}</h3>
+            <h3>{format(new Date(lesson.timestamp), 'MMM d, yyyy')} - {format(new Date(lesson.timestamp), 'h:mm a')}</h3>
             <button
               type="button"
               className="modal-close-btn"

@@ -2,6 +2,7 @@ import type { Lesson, Student } from '../../types/database';
 
 /**
  * Lesson with associated student information
+ * The date field is added for display/comparison purposes (extracted from timestamp)
  */
 export interface LessonWithStudent extends Lesson {
   student?: Student;

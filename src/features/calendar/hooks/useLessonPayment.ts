@@ -1,16 +1,20 @@
 import { useNavigate } from 'react-router-dom';
 import { markLessonAsUnpaid } from '../../payments/services/paymentService';
 import type { LessonWithStudent } from '../types';
+import { extractLocalDateFromUTC } from '../utils/dateUtils';
 
 export function useLessonPayment(refetch: () => void) {
   const navigate = useNavigate();
 
   const handlePayLesson = (lesson: LessonWithStudent) => {
+    // Extract local date from timestamp
+    const lessonDate = extractLocalDateFromUTC(lesson.timestamp);
+    
     navigate('/payments', {
       state: {
         lessonToPay: {
           id: lesson.id,
-          date: lesson.date,
+          date: lessonDate,
           studentId: lesson.student_id,
         }
       }
@@ -19,7 +23,9 @@ export function useLessonPayment(refetch: () => void) {
 
   const handleUnpayLesson = async (lesson: LessonWithStudent) => {
     try {
-      await markLessonAsUnpaid(lesson.id, lesson.date);
+      // Extract local date from timestamp
+      const lessonDate = extractLocalDateFromUTC(lesson.timestamp);
+      await markLessonAsUnpaid(lesson.id, lessonDate);
       refetch();
     } catch (error) {
       console.error('Error marking lesson as unpaid:', error);

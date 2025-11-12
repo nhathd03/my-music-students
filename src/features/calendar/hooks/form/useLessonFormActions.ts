@@ -5,7 +5,7 @@ import type { Lesson } from '../../../../types/database';
 import type { LessonFormData } from '../../types';
 import * as lessonService from '../../services/lesson';
 import type { useRecurrenceSettings } from "../useRecurrenceSettings";
-import { parseUTCDate } from "../../utils/dateUtils";
+import { convertLocalDateTimeToUTC } from "../../utils/dateUtils";
 import { useLessonFormState } from "./useLessonFormState";
 import { useLessonFormModals } from "./useLessonFormModals";
 import { useLessonOperations } from "./useLessonOperations";
@@ -27,9 +27,9 @@ const hasFutureOccurrences = (lesson: Lesson) => {
         // If endType is 'never', there are always future occurrences (infinite series)
         if (parsed.endType === 'never') return true;
         
-        // Check if there's an occurrence after the current lesson date
+        // Check if there's an occurrence after the current lesson timestamp
         const rule = RRule.fromString(lesson.recurrence_rule);
-        const currentDate = new Date(lesson.date);
+        const currentDate = new Date(lesson.timestamp);
         const nextOccurrence = rule.after(currentDate);
         
         return nextOccurrence !== null;
@@ -132,11 +132,15 @@ export function useLessonFormActions(
     };
 
     const performSubmit = async () => {
+        // Convert local date and time to UTC timestamp
+        const timestamp = convertLocalDateTimeToUTC(
+            formState.formData.date,
+            formState.formData.time
+        );
         
         const lessonData: lessonService.LessonInsertData = {
             student_id: parseInt(formState.formData.student_id),
-            date: formState.formData.date,
-            time: formState.formData.time,
+            timestamp: timestamp,
             duration: parseInt(formState.formData.duration),
         };
         
@@ -168,7 +172,8 @@ export function useLessonFormActions(
     };
 
     const handleEdit = (lesson: Lesson) => {
-        const lessonDate = parseUTCDate(lesson.date);
+        // Parse timestamp to extract local date and time for the form
+        const lessonDate = new Date(lesson.timestamp);
         recurrenceSettings.setIsRecurring(!!lesson.recurrence_rule);
 
         const initialFormData: LessonFormData = {

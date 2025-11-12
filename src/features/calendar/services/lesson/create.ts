@@ -1,6 +1,7 @@
 import { supabase } from '../../../../lib/supabase';
 import type { LessonInsertData } from './types';
 import * as lessonNoteService from './notes';
+import { extractLocalDateFromUTC } from '../../utils/dateUtils';
 
 /**
  * Creates a new lesson
@@ -29,9 +30,11 @@ export async function createLesson(lessonData: LessonInsertData): Promise<void> 
   
   // For non-recurring lessons, save note to lesson_note table
   if (!lessonData.recurrence_rule && note) {
+    // Extract local date from the timestamp for lesson_note
+    const lessonDate = extractLocalDateFromUTC(insertedLesson.timestamp);
     await lessonNoteService.upsertLessonNote(
       insertedLesson.id,
-      insertedLesson.date,
+      lessonDate,
       note
     );
   }

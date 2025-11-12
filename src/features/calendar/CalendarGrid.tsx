@@ -2,8 +2,6 @@ import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInte
 import LessonPill from './LessonPill';
 import type { CalendarGridProps } from './types';
 
-import { parseUTCDate } from "./utils/dateUtils"
- 
 export default function CalendarGrid({
   currentDate,
   lessons,
@@ -24,7 +22,11 @@ export default function CalendarGrid({
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const getLessonsForDate = (date: Date) => {
-    return lessons.filter(lesson => isSameDay(parseUTCDate(lesson.date), date));
+    return lessons.filter(lesson => {
+      // Use timestamp to get the lesson date
+      const lessonDate = new Date(lesson.timestamp);
+      return isSameDay(lessonDate, date);
+    });
   };
 
   return (
@@ -55,7 +57,7 @@ export default function CalendarGrid({
               <div className="day-lessons">
                 {dayLessons.map((lesson) => (
                   <LessonPill
-                    key={`${lesson.id}-${lesson.date}`}
+                    key={`${lesson.id}-${lesson.timestamp}`}
                     lesson={lesson}
                     onEdit={onEditLesson}
                     onDelete={onDeleteLesson}

@@ -2,7 +2,6 @@ import { format, addMinutes } from 'date-fns';
 import { Edit2, Trash2, DollarSign } from 'lucide-react';
 import type { LessonPillProps } from './types';
 
-import { parseUTCDate } from "./utils/dateUtils"
 /**
  * Formats a time range for a lesson
  */
@@ -21,7 +20,9 @@ export default function LessonPill({
   onUnpay,
   onMobileClick,
 }: LessonPillProps) {
-  const startDate = parseUTCDate(lesson.date);
+  // Parse timestamp to get the full date/time for display
+  // The timestamp is in UTC, but when converted to Date it will display in local time
+  const startDate = new Date(lesson.timestamp);
   const timeRange = formatLessonTimeRange(startDate, lesson.duration);
   const hasNote = lesson.note && lesson.note.trim().length > 0;
 

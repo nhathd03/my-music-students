@@ -3,6 +3,7 @@ import { rrulestr } from 'rrule';
 import { supabase } from '../../../../lib/supabase';
 import type { Student } from '../../../../types/database';
 import type { LessonWithStudent } from '../../types';
+import { extractLocalTimeFromUTC, extractLocalDateFromUTC } from '../../utils/dateUtils';
 
 /**
  * Fetches all students from the database
@@ -27,6 +28,8 @@ export async function fetchLessonsForMonth(
   const monthEnd = endOfMonth(currentDate);
 
   // Fetch all lessons with student data
+  // For recurring lessons, we fetch all of them and filter by month during expansion
+  // For non-recurring lessons, we filter by timestamp range
   const { data: lessonsData, error: lessonsError } = await supabase
     .from('lesson')
     .select(`
@@ -34,9 +37,9 @@ export async function fetchLessonsForMonth(
       student:student_id (*)
     `)
     .or(
-      `recurrence_rule.not.is.null,and(date.gte.${monthStart.toISOString()},date.lte.${monthEnd.toISOString()})`
+      `recurrence_rule.not.is.null,and(timestamp.gte.${monthStart.toISOString()},timestamp.lte.${monthEnd.toISOString()})`
     )
-    .order('date');
+    .order('timestamp');
 
   if (lessonsError) throw lessonsError;
 
@@ -82,7 +85,7 @@ export async function fetchLessonsForMonth(
 
   // Sort by date
   expandedLessons.sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
   );
 
   return expandedLessons;
@@ -92,6 +95,8 @@ export async function fetchLessonsForMonth(
  * Expands recurring lessons to generate occurrences for the given date range
  * Also marks each occurrence as paid/unpaid based on payment_items
  * and attaches notes from lesson_note table
+ * 
+ * For recurring lessons: extracts local time from UTC timestamp and uses it for all occurrences
  */
 function expandRecurringLessons(
   lessons: any[],
@@ -106,21 +111,25 @@ function expandRecurringLessons(
     if (lesson.recurrence_rule) {
       // Recurring lesson - generate occurrences
       try {
+        // Extract local time from the UTC timestamp stored in database
+        const localTime = extractLocalTimeFromUTC(lesson.timestamp);
+        
         const rrule = rrulestr(lesson.recurrence_rule);
         const occurrences = rrule.between(monthStart, monthEnd, true);
 
         for (const occurrence of occurrences) {
-          // set occurrence to local time to prevent DST changes
-          
-          const occurrenceDate = format(new Date(occurrence), 'yyyy-MM-dd')
+          // Format occurrence date as yyyy-MM-dd
+          const occurrenceDate = format(occurrence, 'yyyy-MM-dd');
           const occurrenceKey = `${lesson.id}-${occurrenceDate}`;
+          
+          const occurrenceTimestamp = `${occurrenceDate}T${localTime}`;
           
           // Get note for this occurrence from noteMap, fallback to lesson.note for backwards compatibility
           const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
           
           result.push({
             ...lesson,
-            date: occurrenceDate,
+            timestamp: occurrenceTimestamp, 
             paid: paidOccurrences.has(occurrenceKey),
             note: occurrenceNote,
           });
@@ -130,17 +139,17 @@ function expandRecurringLessons(
         // Skip this lesson if rrule is invalid
       }
     } else {
-      // Non-recurring lesson - include if within month range
-      const lessonDate = new Date(`${lesson.date}T${lesson.time}`);
+      const lessonLocalDate = extractLocalDateFromUTC(lesson.timestamp);
+      const lessonDate = new Date(lesson.timestamp);
+      
       if (lessonDate >= monthStart && lessonDate <= monthEnd) {
-        const occurrenceKey = `${lesson.id}-${lesson.date}`;
+        const occurrenceKey = `${lesson.id}-${lessonLocalDate}`;
         
         // Get note for this occurrence from noteMap, fallback to lesson.note
         const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
         
         result.push({
           ...lesson,
-          date: lesson.date,
           paid: paidOccurrences.has(occurrenceKey),
           note: occurrenceNote,
         });
