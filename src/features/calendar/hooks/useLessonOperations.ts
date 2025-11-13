@@ -1,10 +1,11 @@
-import type { Lesson } from "../../../../types/database";
-import type { LessonInsertData } from "../../services/lesson";
-import * as lessonService from "../../services/lesson" 
+// hooks/useLessonOperations.ts
+import { useCallback } from 'react';
+import * as lessonService from '../services/lesson';
+import type { Lesson } from '../../../types/database';
+import type { LessonInsertData } from '../services/lesson/types';
 
 export function useLessonOperations() {
-  
-  const createLesson = async (lessonData: LessonInsertData) => {
+  const createLesson = useCallback(async (lessonData: LessonInsertData) => {
     try {
       await lessonService.createLesson(lessonData);
       return { success: true };
@@ -12,9 +13,9 @@ export function useLessonOperations() {
       console.error('Error creating lesson:', error);
       return { success: false, error };
     }
-  };
+  }, []);
 
-  const updateLesson = async (
+  const updateLesson = useCallback(async (
     lesson: Lesson,
     lessonData: LessonInsertData,
     scope?: 'single' | 'future'
@@ -32,9 +33,9 @@ export function useLessonOperations() {
       console.error('Error updating lesson:', error);
       return { success: false, error };
     }
-  };
+  }, []);
 
-  const deleteLesson = async (
+  const deleteLesson = useCallback(async (
     lesson: Lesson,
     scope?: 'single' | 'future'
   ) => {
@@ -51,7 +52,11 @@ export function useLessonOperations() {
       console.error('Error deleting lesson:', error);
       return { success: false, error };
     }
-  };
+  }, []);
 
-  return { createLesson, updateLesson, deleteLesson };
+  return {
+    createLesson,
+    updateLesson,
+    deleteLesson,
+  };
 }

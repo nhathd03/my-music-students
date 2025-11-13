@@ -5,6 +5,11 @@ import type { Student } from '../../../../types/database';
 import type { LessonWithStudent } from '../../types';
 import { extractLocalTimeFromUTC, extractLocalDateFromUTC } from '../../utils/dateUtils';
 
+const formatDate = (date: Date): string => format(date, 'yyyy-MM-dd');
+
+const createOccurrenceKey = (lessonId: number, date: string): string => 
+  `${lessonId}-${date}`;
+
 /**
  * Fetches all students from the database
  */
@@ -19,18 +24,10 @@ export async function fetchStudents(): Promise<Student[]> {
 }
 
 /**
- * Fetches lessons for a given month
+ * Fetches lessons with student data for a given month
  */
-export async function fetchLessonsForMonth(
-  currentDate: Date
-): Promise<LessonWithStudent[]> {
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-
-  // Fetch all lessons with student data
-  // For recurring lessons, we fetch all of them and filter by month during expansion
-  // For non-recurring lessons, we filter by timestamp range
-  const { data: lessonsData, error: lessonsError } = await supabase
+async function fetchLessonsWithStudents(monthStart: Date, monthEnd: Date) {
+  const { data, error } = await supabase
     .from('lesson')
     .select(`
       *,
@@ -41,64 +38,135 @@ export async function fetchLessonsForMonth(
     )
     .order('timestamp');
 
-  if (lessonsError) throw lessonsError;
+  if (error) throw error;
+  return data || [];
+}
 
-  // Fetch all payment items to determine which lessons are paid
-  const lessonIds = (lessonsData || []).map(l => l.id);
-  const { data: paymentItems, error: paymentError } = await supabase
+/**
+ * Fetches payment items and returns a Set of paid occurrence keys
+ */
+async function fetchPaidOccurrences(lessonIds: number[]): Promise<Set<string>> {
+  if (lessonIds.length === 0) return new Set();
+
+  const { data, error } = await supabase
     .from('payment_item')
     .select('lesson_id, lesson_date')
     .in('lesson_id', lessonIds);
 
-  if (paymentError) throw paymentError;
+  if (error) throw error;
 
-  // Create a Set of paid lesson occurrences (lesson_id + date)
-  const paidOccurrences = new Set(
-    (paymentItems || []).map(item => 
-      `${item.lesson_id}-${item.lesson_date}`
-    )
+  return new Set(
+    (data || []).map(item => createOccurrenceKey(item.lesson_id, item.lesson_date))
   );
+}
 
-  // Fetch all lesson notes for per-occurrence notes
-  const { data: lessonNotes, error: notesError } = await supabase
+/**
+ * Fetches lesson notes and returns a Map of occurrence keys to notes
+ */
+async function fetchLessonNotes(lessonIds: number[]): Promise<Map<string, string>> {
+  if (lessonIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
     .from('lesson_note')
     .select('lesson_id, lesson_date, note')
     .in('lesson_id', lessonIds);
 
-  if (notesError) throw notesError;
+  if (error) throw error;
 
-  // Create a Map of lesson notes (lesson_id + date) -> note
   const noteMap = new Map<string, string>();
-  (lessonNotes || []).forEach(note => {
-    const key = `${note.lesson_id}-${note.lesson_date}`;
+  (data || []).forEach(note => {
+    const key = createOccurrenceKey(note.lesson_id, note.lesson_date);
     noteMap.set(key, note.note);
   });
 
-  // Expand recurring lessons for this month
-  const expandedLessons = expandRecurringLessons(
-    lessonsData || [],
-    monthStart,
-    monthEnd,
-    paidOccurrences,
-    noteMap
-  );
-
-  // Sort by date
-  expandedLessons.sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-
-  return expandedLessons;
+  return noteMap;
 }
 
 /**
- * Expands recurring lessons to generate occurrences for the given date range
- * Also marks each occurrence as paid/unpaid based on payment_items
- * and attaches notes from lesson_note table
- * 
- * For recurring lessons: extracts local time from UTC timestamp and uses it for all occurrences
+ * Creates a lesson occurrence with payment status and note
  */
-function expandRecurringLessons(
+function createLessonOccurrence(
+  lesson: any,
+  timestamp: string,
+  occurrenceDate: string,
+  paidOccurrences: Set<string>,
+  noteMap: Map<string, string>
+): LessonWithStudent {
+  const occurrenceKey = createOccurrenceKey(lesson.id, occurrenceDate);
+  const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
+
+  return {
+    ...lesson,
+    timestamp,
+    paid: paidOccurrences.has(occurrenceKey),
+    note: occurrenceNote,
+  };
+}
+
+/**
+ * Expands a recurring lesson into occurrences for the given date range
+ */
+function expandRecurringLesson(
+  lesson: any,
+  monthStart: Date,
+  monthEnd: Date,
+  paidOccurrences: Set<string>,
+  noteMap: Map<string, string>
+): LessonWithStudent[] {
+  try {
+    const localTime = extractLocalTimeFromUTC(lesson.timestamp);
+    const rrule = rrulestr(lesson.recurrence_rule);
+    const occurrences = rrule.between(monthStart, monthEnd, true);
+
+    return occurrences.map(occurrence => {
+      const occurrenceDate = formatDate(occurrence);
+      const occurrenceTimestamp = `${occurrenceDate}T${localTime}`;
+      
+      return createLessonOccurrence(
+        lesson,
+        occurrenceTimestamp,
+        occurrenceDate,
+        paidOccurrences,
+        noteMap
+      );
+    });
+  } catch (error) {
+    console.error(`Error parsing recurrence rule for lesson ${lesson.id}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Processes a non-recurring lesson if it falls within the date range
+ */
+function processNonRecurringLesson(
+  lesson: any,
+  monthStart: Date,
+  monthEnd: Date,
+  paidOccurrences: Set<string>,
+  noteMap: Map<string, string>
+): LessonWithStudent | null {
+  const lessonDate = new Date(lesson.timestamp);
+  
+  if (lessonDate < monthStart || lessonDate > monthEnd) {
+    return null;
+  }
+
+  const lessonLocalDate = extractLocalDateFromUTC(lesson.timestamp);
+  
+  return createLessonOccurrence(
+    lesson,
+    lesson.timestamp,
+    lessonLocalDate,
+    paidOccurrences,
+    noteMap
+  );
+}
+
+/**
+ * Expands recurring lessons and filters non-recurring lessons for the given date range
+ */
+function expandAndFilterLessons(
   lessons: any[],
   monthStart: Date,
   monthEnd: Date,
@@ -109,53 +177,60 @@ function expandRecurringLessons(
 
   for (const lesson of lessons) {
     if (lesson.recurrence_rule) {
-      // Recurring lesson - generate occurrences
-      try {
-        // Extract local time from the UTC timestamp stored in database
-        const localTime = extractLocalTimeFromUTC(lesson.timestamp);
-        
-        const rrule = rrulestr(lesson.recurrence_rule);
-        const occurrences = rrule.between(monthStart, monthEnd, true);
-
-        for (const occurrence of occurrences) {
-          // Format occurrence date as yyyy-MM-dd
-          const occurrenceDate = format(occurrence, 'yyyy-MM-dd');
-          const occurrenceKey = `${lesson.id}-${occurrenceDate}`;
-          
-          const occurrenceTimestamp = `${occurrenceDate}T${localTime}`;
-          
-          // Get note for this occurrence from noteMap, fallback to lesson.note for backwards compatibility
-          const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
-          
-          result.push({
-            ...lesson,
-            timestamp: occurrenceTimestamp, 
-            paid: paidOccurrences.has(occurrenceKey),
-            note: occurrenceNote,
-          });
-        }
-      } catch (error) {
-        console.error(`Error parsing recurrence rule for lesson ${lesson.id}:`, error);
-        // Skip this lesson if rrule is invalid
-      }
+      const occurrences = expandRecurringLesson(
+        lesson,
+        monthStart,
+        monthEnd,
+        paidOccurrences,
+        noteMap
+      );
+      result.push(...occurrences);
     } else {
-      const lessonLocalDate = extractLocalDateFromUTC(lesson.timestamp);
-      const lessonDate = new Date(lesson.timestamp);
-      
-      if (lessonDate >= monthStart && lessonDate <= monthEnd) {
-        const occurrenceKey = `${lesson.id}-${lessonLocalDate}`;
-        
-        // Get note for this occurrence from noteMap, fallback to lesson.note
-        const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
-        
-        result.push({
-          ...lesson,
-          paid: paidOccurrences.has(occurrenceKey),
-          note: occurrenceNote,
-        });
+      const occurrence = processNonRecurringLesson(
+        lesson,
+        monthStart,
+        monthEnd,
+        paidOccurrences,
+        noteMap
+      );
+      if (occurrence) {
+        result.push(occurrence);
       }
     }
   }
 
   return result;
+}
+
+/**
+ * Fetches lessons for a given month
+ */
+export async function fetchLessonsForMonth(
+  currentDate: Date
+): Promise<LessonWithStudent[]> {
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+
+  const lessonsData = await fetchLessonsWithStudents(monthStart, monthEnd);
+  const lessonIds = lessonsData.map(l => l.id);
+
+  const [paidOccurrences, noteMap] = await Promise.all([
+    fetchPaidOccurrences(lessonIds),
+    fetchLessonNotes(lessonIds)
+  ]);
+
+  const expandedLessons = expandAndFilterLessons(
+    lessonsData,
+    monthStart,
+    monthEnd,
+    paidOccurrences,
+    noteMap
+  );
+
+  // Sort by timestamp
+  expandedLessons.sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
+  return expandedLessons;
 }

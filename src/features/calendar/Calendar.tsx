@@ -1,27 +1,70 @@
-import { useCalendar } from './hooks/useCalendar';
 import { useMobileLessonModal } from './hooks/useMobileLessonModal';
+import { useCalendarContext } from './context/CalendarContext';
 import LessonModal from './LessonModal';
 import RecurringEditModal from './RecurringEditModal';
 import LessonActionModal from './LessonActionModal';
 import CalendarNavigation from './CalendarNavigation';
 import CalendarGrid from './CalendarGrid';
 import ConfirmationModal from '../../components/ConfirmationModal';
-import { useLessonPayment } from './hooks/useLessonPayment';
 
 import './styles/Calendar.css';
 
 export default function Calendar() {
-  const { navigation, data, recurrence, form, modals } = useCalendar();
+  const {
+    navigation,
+    data,
+    recurrence,
+    form,
+    modals,
+    formData,
+    editingLesson,
+    goToPreviousMonth,
+    goToNextMonth,
+    handleSubmit,
+    handleEdit,
+    handleDelete,
+    handleConfirmDelete,
+    handleDateClick,
+    handleRequestClose,
+    handleConfirmDiscard,
+    handlePayLesson,
+    handleUnpayLesson,
+    updateFormData,
+    resetForm,
+    hasFormChanged,
+    setIsRecurring,
+    setFrequency,
+    setInterval,
+    setEndType,
+    setUntilDate,
+    setOccurrenceCount,
+    setRecurringEditScope,
+    resetRecurringState,
+  } = useCalendarContext();
+
   const lessonActionModal = useMobileLessonModal();
- const { handlePayLesson, handleUnpayLesson } = useLessonPayment(data.refetch);
  
   if (data.loading) {
     return <div className="calendar-loading">Loading calendar...</div>;
   }
 
+  const recurrenceProps = {
+    isRecurring: recurrence.isRecurring,
+    setIsRecurring,
+    frequency: recurrence.frequency,
+    setFrequency,
+    interval: recurrence.interval,
+    setInterval,
+    endType: recurrence.endType,
+    setEndType,
+    untilDate: recurrence.untilDate || '',
+    setUntilDate,
+    occurrenceCount: recurrence.occurrenceCount,
+    setOccurrenceCount,
+  };
+
   return (
     <div className="calendar-container">
-      {/* Header Section */}
       <div className="calendar-header">
         <div>
           <h2>Lesson Calendar</h2>
@@ -29,41 +72,37 @@ export default function Calendar() {
         </div>
       </div>
 
-      {/* Lesson Form Modal */}
       {form.showForm && (
-        <div className="modal-overlay" onClick={form.handleRequestClose}>
+        <div className="modal-overlay" onClick={handleRequestClose}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <LessonModal
               students={data.students}
-              formData={form.formData}
-              editingLesson={form.editingLesson}
-              recurrence={recurrence}
-              hasFormChanged={form.hasFormChanged()}
-              onSubmit={form.handleSubmit}
-              onCancel={form.resetForm}
-              onChange={form.updateFormData}
-              onRequestClose={form.handleRequestClose}
+              formData={formData}
+              editingLesson={editingLesson}
+              recurrence={recurrenceProps}
+              hasFormChanged={hasFormChanged()}
+              onSubmit={handleSubmit}
+              onCancel={resetForm}
+              onChange={updateFormData}
+              onRequestClose={handleRequestClose}
             />
           </div>
         </div>
       )}
 
-      {/* Unsaved Changes Confirmation Modal */}
       {modals.showConfirmDiscard && (
         <ConfirmationModal
           title="Discard Changes?"
           message="You have unsaved changes. Are you sure you want to discard them?"
           confirmText="Discard"
           cancelText="Cancel"
-          onConfirm={form.handleConfirmDiscard}
+          onConfirm={handleConfirmDiscard}
           onCancel={() => {
-            modals.setShowConfirmDiscard(false);
-            form.setShowForm(true);
+            handleRequestClose();
           }}
         />
       )}
 
-      {/* Delete Confirmation Modal */}
       {modals.showConfirmDelete && (
         <ConfirmationModal
           title="Delete Lesson?"
@@ -71,48 +110,43 @@ export default function Calendar() {
           confirmText="Delete"
           cancelText="Cancel"
           variant="danger"
-          onConfirm={form.handleConfirmDelete}
-          onCancel={() => {
-            modals.setShowConfirmDelete(false);
-          }}
+          onConfirm={handleConfirmDelete}
+          onCancel={handleRequestClose}
         />
       )}
 
-      {/* Recurring Edit Modal */}
       {modals.showRecurringEditModal && (
         <RecurringEditModal
           action={modals.recurringAction}
-          setRecurringEditScope={modals.setRecurringEditScope}
-          onCancel={modals.resetRecurringState}
+          setRecurringEditScope={setRecurringEditScope}
+          onCancel={resetRecurringState}
         />
       )}
 
-      {/* Lesson Action Modal - Mobile only */}
       {lessonActionModal.isOpen && lessonActionModal.selectedLesson && (
         <LessonActionModal
           lesson={lessonActionModal.selectedLesson}
-          onEdit={form.handleEdit}
-          onDelete={form.handleDelete}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
           onPay={handlePayLesson}
           onUnpay={handleUnpayLesson}
           onClose={lessonActionModal.handleClose}
         />
       )}
 
-      {/* Calendar Section */}
       <div className="card">
         <CalendarNavigation
           currentDate={navigation.currentDate}
-          onPreviousMonth={navigation.goToPreviousMonth}
-          onNextMonth={navigation.goToNextMonth}
+          onPreviousMonth={goToPreviousMonth}
+          onNextMonth={goToNextMonth}
         />
 
         <CalendarGrid
           currentDate={navigation.currentDate}
           lessons={data.lessons}
-          onDateClick={form.handleDateClick}
-          onEditLesson={form.handleEdit}
-          onDeleteLesson={form.handleDelete}
+          onDateClick={handleDateClick}
+          onEditLesson={handleEdit}
+          onDeleteLesson={handleDelete}
           onPayLesson={handlePayLesson}
           onUnpayLesson={handleUnpayLesson}
           onLessonClick={lessonActionModal.handleLessonClick}

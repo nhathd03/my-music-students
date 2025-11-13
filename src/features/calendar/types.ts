@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Lesson, Student } from '../../types/database';
 
 /**
@@ -33,7 +34,7 @@ export interface RecurrenceSettings {
   setInterval: (interval: number) => void;
   endType: 'never' | 'until' | 'count';
   setEndType: (endType: 'never' | 'until' | 'count') => void;
-  untilDate: string;
+  untilDate: string | null;
   setUntilDate: (untilDate: string) => void;
   occurrenceCount: number;
   setOccurrenceCount: (occurrenceCount: number) => void;
@@ -75,5 +76,69 @@ export interface LessonPillProps {
   onPay: (lesson: LessonWithStudent) => void;
   onUnpay?: (lesson: LessonWithStudent) => void;
   onMobileClick?: () => void;
+}
+
+export interface CalendarContextValue {
+  navigation: {
+    currentDate: Date;
+  };
+  data: {
+    lessons: LessonWithStudent[];
+    students: Student[];
+    loading: boolean;
+  };
+  form: {
+    showForm: boolean;
+  };
+  modals: {
+    showConfirmDiscard: boolean;
+    showConfirmDelete: boolean;
+    showRecurringEditModal: boolean;
+    pendingDeleteLesson: Lesson | null;
+    pendingDeleteScope: 'single' | 'future' | null;
+    recurringEditScope: 'single' | 'future' | null;
+    recurringAction: 'edit' | 'delete' | null;
+  };
+  dispatch: React.Dispatch<any>;
+  goToPreviousMonth: () => void;
+  goToNextMonth: () => void;
+  refetch: () => Promise<void>;
+  recurrence: {
+    isRecurring: boolean;
+    frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY';
+    interval: number;
+    endType: 'never' | 'until' | 'count';
+    untilDate: string | null;
+    occurrenceCount: number;
+  };
+  setIsRecurring: (enabled: boolean) => void;
+  setFrequency: (frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY') => void;
+  setInterval: (interval: number) => void;
+  setEndType: (endType: 'never' | 'until' | 'count') => void;
+  setUntilDate: (date: string) => void;
+  setOccurrenceCount: (count: number) => void;
+  loadFromRRule: (rrule: string) => void;
+  generateRRuleString: (date: string, time: string) => string | null;
+  hasFutureOccurrences: (lesson: Lesson) => boolean;
+  reset: () => void;
+  formData: LessonFormData;
+  editingLesson: Lesson | null;
+  showForm: () => void;
+  hideForm: () => void;
+  loadFormData: (data: LessonFormData, lesson?: Lesson) => void;
+  updateFormData: (data: Partial<LessonFormData>) => void;
+  hasFormChanged: () => boolean;
+  resetForm: () => void;
+  handleSubmit: (e: React.FormEvent) => Promise<void>;
+  handleEdit: (lesson: Lesson) => void;
+  handleDelete: (lesson: Lesson) => void;
+  handleConfirmDelete: () => Promise<void>;
+  handleDateClick: (date: Date) => void;
+  handleRequestClose: () => void;
+  handleConfirmDiscard: () => void;
+  handlePayLesson: (lesson: LessonWithStudent) => void;
+  handleUnpayLesson: (lesson: LessonWithStudent) => Promise<void>;
+  setRecurringEditScope: (scope: 'single' | 'future' | null) => void;
+  resetRecurringState: () => void;
 }
 

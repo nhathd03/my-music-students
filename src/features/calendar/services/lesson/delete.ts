@@ -27,6 +27,10 @@ const createUntilDate = (timestamp: string): Date => {
   return untilDate;
 };
 
+const isFirstOccurrence = (lesson: Lesson, originalLesson: Lesson): boolean => {
+  return new Date(originalLesson.timestamp).getTime() === new Date(lesson.timestamp).getTime();
+};
+
 /**
  * Deletes a non-recurring lesson
  */
@@ -98,6 +102,27 @@ async function createRecurringSeriesFromOccurrence(
 }
 
 /**
+ * Handles remaining occurrences after deleting the first one
+ */
+async function handleRemainingAfterFirstDelete(
+  originalLesson: Lesson,
+  allOccurrences: Date[],
+  rruleOptions: any
+): Promise<void> {
+  const afterOccurrences = allOccurrences.slice(1);
+  if (afterOccurrences.length === 0) return;
+
+  const localTime = extractLocalTimeFromUTC(originalLesson.timestamp);
+  const nextOccurrence = afterOccurrences[0];
+  
+  if (afterOccurrences.length === 1) {
+    await createSingleLessonFromOccurrence(originalLesson, nextOccurrence, localTime);
+  } else {
+    await createRecurringSeriesFromOccurrence(originalLesson, nextOccurrence, localTime, rruleOptions);
+  }
+}
+
+/**
  * Deletes all future occurrences of a recurring lesson (including the current one)
  */
 export async function deleteFutureOccurrences(lesson: Lesson): Promise<void> {
@@ -109,19 +134,14 @@ export async function deleteFutureOccurrences(lesson: Lesson): Promise<void> {
 
   if (error) throw error;
 
-  const rrule = rrulestr(originalLesson.recurrence_rule);
-  const startDate = new Date(originalLesson.timestamp);
-  
-  // Compare timestamps by converting both to Date objects and comparing
-  // This handles cases where one has 'Z' and the other doesn't
-  const originalTimestampDate = new Date(originalLesson.timestamp);
-  const lessonTimestampDate = new Date(lesson.timestamp);
-  
   // If this is the first occurrence, delete the entire lesson
-  if (originalTimestampDate.getTime() === lessonTimestampDate.getTime()) {
+  if (isFirstOccurrence(lesson, originalLesson)) {
     await deleteLesson(lesson.id);
     return;
   }
+
+  const rrule = rrulestr(originalLesson.recurrence_rule);
+  const startDate = new Date(originalLesson.timestamp);
 
   // Truncate to end before this occurrence
   const untilDate = createUntilDate(lesson.timestamp);
@@ -166,72 +186,33 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
   const endDate = getOccurrenceEndDate(rrule, startDate);
   const allOccurrences = rrule.between(startDate, endDate, true);
 
-  // Check if this is the first occurrence by comparing to the original lesson timestamp
-  // Note: rrule.between() excludes the dtstart date, so the first occurrence is not in the array
-  const originalTimestampDate = new Date(originalLesson.timestamp);
-  const lessonTimestampDate = new Date(lesson.timestamp);
-  
-  let currentIndex: number;
-  
-  if (originalTimestampDate.getTime() === lessonTimestampDate.getTime()) {
-    // This is the first occurrence (dtstart), which is not included in allOccurrences
-    currentIndex = -1; // Use -1 to indicate it's the first occurrence (before index 0)
-  } else {
-    // Search in the allOccurrences array
-    const lessonDate = extractLocalDateFromUTC(lesson.timestamp);
-    currentIndex = allOccurrences.findIndex(occ => formatDate(occ) === lessonDate);
-    
-    if (currentIndex === -1) {
-      throw new Error('Occurrence not found in recurrence rule');
-    }
+  // CASE 1: First occurrence - delete and recreate remaining
+  if (isFirstOccurrence(lesson, originalLesson)) {
+    await deleteLesson(lesson.id);
+    await handleRemainingAfterFirstDelete(originalLesson, allOccurrences, rrule.options);
+    return;
   }
-  
-  // Calculate total occurrences (allOccurrences.length + 1, since first occurrence is not in array)
-  const totalOccurrences = allOccurrences.length + 1;
+
+  // Find the occurrence index
+  const lessonDate = extractLocalDateFromUTC(lesson.timestamp);
+  const currentIndex = allOccurrences.findIndex(occ => formatDate(occ) === lessonDate);
+
+  if (currentIndex === -1) {
+    throw new Error('Occurrence not found in recurrence rule');
+  }
 
   const localTime = extractLocalTimeFromUTC(originalLesson.timestamp);
 
   // Only one occurrence total - delete the lesson
-  if (totalOccurrences === 1) {
+  if (allOccurrences.length === 1) {
     await deleteLesson(lesson.id);
     return;
   }
 
   // Only two occurrences - keep the other one as single lesson
-  if (totalOccurrences === 2) {
-    if (currentIndex === -1) {
-      // Deleting the first occurrence, so keep the second (allOccurrences[0])
-      await convertToSingleLesson(lesson.id, allOccurrences[0], localTime);
-    } else {
-      // Deleting the second occurrence, so keep the first (original timestamp)
-      // Just remove recurrence_rule, keep the original timestamp
-      await supabase
-        .from('lesson')
-        .update({ 
-          recurrence_rule: null
-        })
-        .eq('id', lesson.id);
-    }
-    return;
-  }
-
-  // First occurrence - shift series to start from next occurrence
-  if (currentIndex === -1) {
-    // The next occurrence after the first one is at index 0 in allOccurrences
-    const nextOccurrence = allOccurrences[0];
-    const newRule = new RRule({
-      ...rrule.options,
-      dtstart: nextOccurrence,
-    });
-
-    const newTimestamp = constructTimestampWithLocalTime(nextOccurrence, localTime);
-    await supabase
-      .from('lesson')
-      .update({ 
-        timestamp: newTimestamp,
-        recurrence_rule: newRule.toString()
-      })
-      .eq('id', lesson.id);
+  if (allOccurrences.length === 2) {
+    const remainingOccurrence = currentIndex === 0 ? allOccurrences[1] : allOccurrences[0];
+    await convertToSingleLesson(lesson.id, remainingOccurrence, localTime);
     return;
   }
 
@@ -257,20 +238,7 @@ export async function deleteSingleOccurrence(lesson: Lesson): Promise<void> {
   // Handle the "before" part
   const untilDate = createUntilDate(lesson.timestamp);
   
-  // Calculate total before occurrences (including the first one which is not in the array)
-  const totalBeforeOccurrences = beforeOccurrences.length + 1; // +1 for the original first occurrence
-  
-  if (totalBeforeOccurrences === 1) {
-    // Only the first occurrence remains - convert original to single lesson
-    // Keep the original timestamp (first occurrence)
-    await supabase
-      .from('lesson')
-      .update({ 
-        recurrence_rule: null
-      })
-      .eq('id', lesson.id);
-  } else if (totalBeforeOccurrences === 2) {
-    // Two occurrences before this one: the first (original) and one from beforeOccurrences
+  if (beforeOccurrences.length === 1) {
     await convertToSingleLesson(lesson.id, beforeOccurrences[0], localTime);
   } else {
     const truncatedRule = new RRule({

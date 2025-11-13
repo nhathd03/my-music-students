@@ -1,6 +1,7 @@
 import { rrulestr } from 'rrule';
 import { supabase } from '../../../lib/supabase';
 import type { LessonForPayment } from '../types';
+import { extractLocalDateFromUTC } from '../../calendar/utils/dateUtils';
 
 /**
  * Payment Service
@@ -17,9 +18,9 @@ export async function fetchUnpaidLessons(studentId: number): Promise<LessonForPa
     // Fetch all lessons for this student
     const { data: lessons, error: lessonsError } = await supabase
       .from('lesson')
-      .select('id, date, duration, student_id, note, recurrence_rule')
+      .select('id, timestamp, duration, student_id, note, recurrence_rule')
       .eq('student_id', studentId)
-      .order('date', { ascending: true });
+      .order('timestamp', { ascending: true });
 
     if (lessonsError) throw lessonsError;
 
@@ -50,7 +51,7 @@ export async function fetchUnpaidLessons(studentId: number): Promise<LessonForPa
         // Recurring lesson - expand into occurrences
         try {
           const rrule = rrulestr(lesson.recurrence_rule);
-          const lessonStartDate = new Date(lesson.date);
+          const lessonStartDate = new Date(lesson.timestamp);
           
           // Generate occurrences starting from the lesson's original start date
           const farFuture = new Date(today.getTime() + 1095 * 24 * 60 * 60 * 1000); // 3 years
@@ -64,7 +65,7 @@ export async function fetchUnpaidLessons(studentId: number): Promise<LessonForPa
           let unpaidCount = 0;
           
           for (const occurrence of allOccurrences) {
-            const occurrenceDate = occurrence.toISOString();
+            const occurrenceDate = extractLocalDateFromUTC(occurrence.toISOString());
             const occurrenceKey = `${lesson.id}-${occurrenceDate}`;
             
             // Skip if this specific occurrence is already paid
@@ -94,13 +95,13 @@ export async function fetchUnpaidLessons(studentId: number): Promise<LessonForPa
         }
       } else {
         // Non-recurring lesson - add if not paid
-        const lessonDate = new Date(lesson.date).toISOString();
+        const lessonDate = new Date(lesson.timestamp).toISOString();
         const occurrenceKey = `${lesson.id}-${lessonDate}`;
         
         if (!paidOccurrenceKeys.has(occurrenceKey)) {
           unpaidLessons.push({
             id: lesson.id,
-            date: lesson.date,
+            date: lesson.timestamp,
             duration: lesson.duration,
             student_id: lesson.student_id,
             note: null, // Notes not needed in payment selection

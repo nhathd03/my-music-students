@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 
 interface RecurringEditModalProps {
   action: 'edit' | 'delete' | 'togglePaid' | null;
-  setRecurringEditScope: React.Dispatch<React.SetStateAction<'single' | 'future' | null>>;
+  setRecurringEditScope: (scope: 'single' | 'future' | null) => void;
   onCancel: () => void;
 }
 
