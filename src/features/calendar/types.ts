@@ -6,6 +6,7 @@ import type { Lesson, Student } from '../../types/database';
  * The date field is added for display/comparison purposes (extracted from timestamp)
  */
 export interface LessonWithStudent extends Lesson {
+  initialDate?: string; //for recurring lessons
   student?: Student;
   paid?: boolean;  // Calculated from payment_items
 }
@@ -46,6 +47,8 @@ export interface LessonModalProps {
   editingLesson: Lesson | null;
   recurrence: RecurrenceSettings;
   hasFormChanged: boolean;
+  hasRecurrenceOptionsChanged: boolean;
+  getLastOccurrence: (rruleString: string) => string | null;
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
   onChange: (data: Partial<LessonFormData>) => void;
@@ -94,6 +97,7 @@ export interface CalendarContextValue {
     showConfirmDiscard: boolean;
     showConfirmDelete: boolean;
     showRecurringEditModal: boolean;
+    showRecurrenceChangeConfirm: boolean;
     pendingDeleteLesson: Lesson | null;
     pendingDeleteScope: 'single' | 'future' | null;
     recurringEditScope: 'single' | 'future' | null;
@@ -119,6 +123,7 @@ export interface CalendarContextValue {
   setOccurrenceCount: (count: number) => void;
   loadFromRRule: (rrule: string) => void;
   generateRRuleString: (date: string, time: string) => string | null;
+  getLastOccurrence: (rruleString: string) => string | null;
   hasFutureOccurrences: (lesson: Lesson) => boolean;
   reset: () => void;
   formData: LessonFormData;
@@ -128,6 +133,8 @@ export interface CalendarContextValue {
   loadFormData: (data: LessonFormData, lesson?: Lesson) => void;
   updateFormData: (data: Partial<LessonFormData>) => void;
   hasFormChanged: () => boolean;
+  hasRecurrenceChanged: () => boolean;
+  hasRecurrenceOptionsChanged: () => boolean;
   resetForm: () => void;
   handleSubmit: (e: React.FormEvent) => Promise<void>;
   handleEdit: (lesson: Lesson) => void;
@@ -140,5 +147,7 @@ export interface CalendarContextValue {
   handleUnpayLesson: (lesson: LessonWithStudent) => Promise<void>;
   setRecurringEditScope: (scope: 'single' | 'future' | null) => void;
   resetRecurringState: () => void;
+  handleConfirmRecurrenceChange: () => Promise<void>;
+  handleCancelRecurrenceChange: () => void;
 }
 

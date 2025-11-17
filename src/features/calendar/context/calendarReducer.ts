@@ -18,6 +18,7 @@ export interface CalendarState {
     showConfirmDiscard: boolean;
     showConfirmDelete: boolean;
     showRecurringEditModal: boolean;
+    showRecurrenceChangeConfirm: boolean;
     pendingDeleteLesson: Lesson | null;
     pendingDeleteScope: 'single' | 'future' | null;
     recurringEditScope: 'single' | 'future' | null;
@@ -41,6 +42,8 @@ export type CalendarAction =
   | { type: 'HIDE_CONFIRM_DELETE' }
   | { type: 'SHOW_RECURRING_EDIT_MODAL'; payload: 'edit' | 'delete' }
   | { type: 'HIDE_RECURRING_EDIT_MODAL' }
+  | { type: 'SHOW_RECURRENCE_CHANGE_CONFIRM' }
+  | { type: 'HIDE_RECURRENCE_CHANGE_CONFIRM' }
   | { type: 'SET_RECURRING_EDIT_SCOPE'; payload: 'single' | 'future' | null }
   | { type: 'RESET_RECURRING_STATE' };
 
@@ -60,6 +63,7 @@ const initialState: CalendarState = {
     showConfirmDiscard: false,
     showConfirmDelete: false,
     showRecurringEditModal: false,
+    showRecurrenceChangeConfirm: false,
     pendingDeleteLesson: null,
     pendingDeleteScope: null,
     recurringEditScope: null,
@@ -148,6 +152,7 @@ export function calendarReducer(state: CalendarState, action: CalendarAction): C
           showConfirmDiscard: false,
           showConfirmDelete: false,
           showRecurringEditModal: false,
+          showRecurrenceChangeConfirm: false,
           pendingDeleteLesson: null,
           pendingDeleteScope: null,
           recurringEditScope: null,
@@ -214,6 +219,24 @@ export function calendarReducer(state: CalendarState, action: CalendarAction): C
         },
       };
 
+    case 'SHOW_RECURRENCE_CHANGE_CONFIRM':
+      return {
+        ...state,
+        modals: {
+          ...state.modals,
+          showRecurrenceChangeConfirm: true,
+        },
+      };
+
+    case 'HIDE_RECURRENCE_CHANGE_CONFIRM':
+      return {
+        ...state,
+        modals: {
+          ...state.modals,
+          showRecurrenceChangeConfirm: false,
+        },
+      };
+
     case 'SET_RECURRING_EDIT_SCOPE':
       return {
         ...state,
@@ -229,6 +252,7 @@ export function calendarReducer(state: CalendarState, action: CalendarAction): C
         modals: {
           ...state.modals,
           showRecurringEditModal: false,
+          showRecurrenceChangeConfirm: false,
           recurringEditScope: null,
           recurringAction: null,
         },

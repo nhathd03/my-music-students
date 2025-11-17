@@ -18,6 +18,7 @@ export function useLessonForm() {
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
 
   const loadFormData = useCallback((data: LessonFormData, lesson?: Lesson) => {
+    console.log("hello", lesson)
     setFormData(data);
     setOriginalFormData(data);
     setEditingLesson(lesson || null);
@@ -27,6 +28,26 @@ export function useLessonForm() {
     setFormData(prev => ({ ...prev, ...data }));
   }, []);
 
+  // Check if non-recurring fields (date, time, duration, note) have changed
+  const hasNonRecurringFieldsChanged = useMemo(() => {
+    if (!originalFormData) return false;
+    
+    return (
+      formData.date !== originalFormData.date ||
+      formData.time !== originalFormData.time ||
+      formData.duration !== originalFormData.duration ||
+      formData.note !== originalFormData.note
+    );
+  }, [formData, originalFormData]);
+
+  // Check if recurrence rule has changed
+  const hasRecurrenceRuleChanged = useMemo(() => {
+    if (!originalFormData) return false;
+    
+    return formData.recurrence_rule !== originalFormData.recurrence_rule;
+  }, [formData, originalFormData]);
+
+  // Overall form change detection
   const hasChanged = useMemo(() => {
     if (!originalFormData) {
       const hasStudent = !!formData.student_id;
@@ -38,20 +59,17 @@ export function useLessonForm() {
     
     return (
       formData.student_id !== originalFormData.student_id ||
-      formData.date !== originalFormData.date ||
-      formData.time !== originalFormData.time ||
-      formData.duration !== originalFormData.duration ||
-      formData.recurrence_rule !== originalFormData.recurrence_rule ||
-      formData.note !== originalFormData.note
+      hasNonRecurringFieldsChanged ||
+      hasRecurrenceRuleChanged
     );
-  }, [formData, originalFormData]);
+  }, [formData, originalFormData, hasNonRecurringFieldsChanged, hasRecurrenceRuleChanged]);
 
   const reset = useCallback(() => {
     setFormData({
       student_id: '',
       date: '',
       time: '',
-      duration: '60',
+      duration: '',
       recurrence_rule: null,
       note: null,
     });
@@ -91,6 +109,8 @@ export function useLessonForm() {
     loadFormData,
     updateFormData,
     hasChanged,
+    hasNonRecurringFieldsChanged,
+    hasRecurrenceRuleChanged,
     reset,
     initializeForDate,
     initializeForEdit,

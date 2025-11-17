@@ -2,6 +2,7 @@ import { useMobileLessonModal } from './hooks/useMobileLessonModal';
 import { useCalendarContext } from './context/CalendarContext';
 import LessonModal from './LessonModal';
 import RecurringEditModal from './RecurringEditModal';
+import RecurrenceChangeConfirmModal from './RecurrenceChangeConfirmModal';
 import LessonActionModal from './LessonActionModal';
 import CalendarNavigation from './CalendarNavigation';
 import CalendarGrid from './CalendarGrid';
@@ -32,14 +33,18 @@ export default function Calendar() {
     updateFormData,
     resetForm,
     hasFormChanged,
+    hasRecurrenceOptionsChanged,
     setIsRecurring,
     setFrequency,
     setInterval,
     setEndType,
     setUntilDate,
     setOccurrenceCount,
+    getLastOccurrence,
     setRecurringEditScope,
     resetRecurringState,
+    handleConfirmRecurrenceChange,
+    handleCancelRecurrenceChange,
   } = useCalendarContext();
 
   const lessonActionModal = useMobileLessonModal();
@@ -81,6 +86,8 @@ export default function Calendar() {
               editingLesson={editingLesson}
               recurrence={recurrenceProps}
               hasFormChanged={hasFormChanged()}
+              hasRecurrenceOptionsChanged={hasRecurrenceOptionsChanged()}
+              getLastOccurrence={getLastOccurrence}
               onSubmit={handleSubmit}
               onCancel={resetForm}
               onChange={updateFormData}
@@ -120,6 +127,13 @@ export default function Calendar() {
           action={modals.recurringAction}
           setRecurringEditScope={setRecurringEditScope}
           onCancel={resetRecurringState}
+        />
+      )}
+
+      {modals.showRecurrenceChangeConfirm && (
+        <RecurrenceChangeConfirmModal
+          onConfirm={handleConfirmRecurrenceChange}
+          onCancel={handleCancelRecurrenceChange}
         />
       )}
 

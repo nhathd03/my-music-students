@@ -586,6 +586,20 @@
   gap: 1.25rem;
 }
 
+/* Warning message when recurrence options are edited */
+.recurrence-warning {
+  padding: 0.75rem 1rem;
+  background-color: #fee;
+  border: 1px solid #fcc;
+  border-radius: var(--radius-sm);
+  color: #c33;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 /* Recurrence Pattern (Interval + Frequency) */
 .recurrence-pattern .label {
   margin-bottom: 0.5rem;

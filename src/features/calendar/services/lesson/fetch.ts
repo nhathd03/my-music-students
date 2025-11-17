@@ -90,7 +90,8 @@ function createLessonOccurrence(
   timestamp: string,
   occurrenceDate: string,
   paidOccurrences: Set<string>,
-  noteMap: Map<string, string>
+  noteMap: Map<string, string>,
+  initialDate?: string,
 ): LessonWithStudent {
   const occurrenceKey = createOccurrenceKey(lesson.id, occurrenceDate);
   const occurrenceNote = noteMap.get(occurrenceKey) || lesson.note || null;
@@ -98,6 +99,7 @@ function createLessonOccurrence(
   return {
     ...lesson,
     timestamp,
+    initialDate: initialDate ? initialDate : null,
     paid: paidOccurrences.has(occurrenceKey),
     note: occurrenceNote,
   };
@@ -114,6 +116,7 @@ function expandRecurringLesson(
   noteMap: Map<string, string>
 ): LessonWithStudent[] {
   try {
+    const localDate = extractLocalDateFromUTC(lesson.timestamp);
     const localTime = extractLocalTimeFromUTC(lesson.timestamp);
     const rrule = rrulestr(lesson.recurrence_rule);
     const occurrences = rrule.between(monthStart, monthEnd, true);
@@ -127,7 +130,8 @@ function expandRecurringLesson(
         occurrenceTimestamp,
         occurrenceDate,
         paidOccurrences,
-        noteMap
+        noteMap,
+        localDate,
       );
     });
   } catch (error) {

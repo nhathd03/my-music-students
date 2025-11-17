@@ -72,24 +72,38 @@ export function useCalendarHandlers({
     if (result.success) {
       form.reset();
       recurrence.reset();
+      dispatch({ type: 'HIDE_FORM' });
+      dispatch({ type: 'RESET_RECURRING_STATE' });
       await refetch();
     } else {
       alert('Failed to save lesson');
     }
-  }, [form, operations, state.modals.recurringEditScope, refetch, recurrence]);
+  }, [form, operations, state.modals.recurringEditScope, refetch, recurrence, dispatch]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (form.editingLesson?.recurrence_rule && !state.modals.recurringEditScope) {
       if (recurrence.hasFutureOccurrences(form.editingLesson)) {
-        dispatch({ type: 'SHOW_RECURRING_EDIT_MODAL', payload: 'edit' });
-        return;
+        const hasNonRecurringChanged = form.hasNonRecurringFieldsChanged;
+        const hasRecurrenceOptionsChanged = recurrence.hasRecurrenceOptionsChanged();
+
+        if (hasRecurrenceOptionsChanged) {
+          // Recurrence options changed (with or without non-recurring fields)
+          // Automatically edit all future occurrences
+          dispatch({ type: 'SET_RECURRING_EDIT_SCOPE', payload: 'future' });
+          dispatch({ type: 'SHOW_RECURRENCE_CHANGE_CONFIRM' });
+          return;
+        } else if (hasNonRecurringChanged) {
+          // Only non-recurring fields changed → show the standard modal
+          dispatch({ type: 'SHOW_RECURRING_EDIT_MODAL', payload: 'edit' });
+          return;
+        }
       }
     }
 
     await performSubmit();
-  }, [form.editingLesson, state.modals.recurringEditScope, recurrence, dispatch, performSubmit]);
+  }, [form, state.modals.recurringEditScope, recurrence, dispatch, performSubmit]);
 
   const handleEdit = useCallback((lesson: Lesson) => {
     recurrence.setIsRecurring(!!lesson.recurrence_rule);
@@ -128,9 +142,11 @@ export function useCalendarHandlers({
       await refetch();
       dispatch({ type: 'HIDE_CONFIRM_DELETE' });
       dispatch({ type: 'RESET_RECURRING_STATE' });
+      dispatch({ type: 'HIDE_FORM' });
     } else {
       alert('Failed to delete lesson');
       dispatch({ type: 'HIDE_CONFIRM_DELETE' });
+      dispatch({ type: 'HIDE_FORM' });
     }
   }, [state.modals, operations, refetch, dispatch]);
 
@@ -181,11 +197,29 @@ export function useCalendarHandlers({
     }
   }, [refetch]);
 
-  const setRecurringEditScope = useCallback((scope: 'single' | 'future' | null) => {
+  const setRecurringEditScope = useCallback(async (scope: 'single' | 'future' | null) => {
     dispatch({ type: 'SET_RECURRING_EDIT_SCOPE', payload: scope });
-  }, [dispatch]);
+    dispatch({ type: 'HIDE_RECURRING_EDIT_MODAL' });
+    if (form.editingLesson) {
+      await performSubmit();
+      // performSubmit handles form reset, modal hiding, and refetch on success
+    }
+  }, [dispatch, form.editingLesson, performSubmit]);
 
   const resetRecurringState = useCallback(() => {
+    dispatch({ type: 'RESET_RECURRING_STATE' });
+  }, [dispatch]);
+
+  const handleConfirmRecurrenceChange = useCallback(async () => {
+    // Proceed with the update since scope is already set to 'future'
+    dispatch({ type: 'HIDE_RECURRENCE_CHANGE_CONFIRM' });
+    await performSubmit();
+    // performSubmit handles form reset, modal hiding, recurring state reset, and refetch on success
+  }, [performSubmit, dispatch]);
+
+  const handleCancelRecurrenceChange = useCallback(() => {
+    // Cancel the update and close the modal
+    dispatch({ type: 'HIDE_RECURRENCE_CHANGE_CONFIRM' });
     dispatch({ type: 'RESET_RECURRING_STATE' });
   }, [dispatch]);
 
@@ -203,5 +237,7 @@ export function useCalendarHandlers({
     handleUnpayLesson,
     setRecurringEditScope,
     resetRecurringState,
+    handleConfirmRecurrenceChange,
+    handleCancelRecurrenceChange,
   };
 }

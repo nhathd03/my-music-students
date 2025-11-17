@@ -1,6 +1,6 @@
 // hooks/useRecurrenceLogic.ts
 import { useState, useCallback } from 'react';
-import { parseRRule, generateRRule } from '../utils/rruleUtils';
+import { parseRRule, generateRRule, updateRRuleOptions, getLastOccurrenceDate } from '../utils/rruleUtils';
 import { RRule } from 'rrule';
 import type { Lesson } from '../../../types/database';
 
@@ -22,6 +22,8 @@ export function useRecurrenceLogic() {
     untilDate: null,
     occurrenceCount: 10,
   });
+
+  const [originalRecurrence, setOriginalRecurrence] = useState<RecurrenceState | null>(null);
 
   const setIsRecurring = useCallback((enabled: boolean) => {
     setRecurrence(prev => ({ ...prev, isRecurring: enabled }));
@@ -49,22 +51,47 @@ export function useRecurrenceLogic() {
 
   const loadFromRRule = useCallback((rrule: string) => {
     const parsed = parseRRule(rrule);
+    console.log(parsed)
     if (parsed) {
-      setRecurrence({
+      const loadedRecurrence: RecurrenceState = {
         isRecurring: true,
         frequency: parsed.frequency,
         interval: parsed.interval,
         endType: parsed.endType,
         untilDate: parsed.untilDate,
         occurrenceCount: parsed.occurrenceCount,
-      });
+      };
+      setRecurrence(loadedRecurrence);
+      // Store as original to detect changes to recurrence options
+      setOriginalRecurrence(loadedRecurrence);
     }
   }, []);
 
   const generateRRuleString = useCallback((date: string, time: string): string | null => {
     if (!recurrence.isRecurring || !date || !time) return null;
     
-    return generateRRule(date, time, {
+   const rule = generateRRule(date, time, {
+      frequency: recurrence.frequency,
+      interval: recurrence.interval,
+      endType: recurrence.endType,
+      untilDate: recurrence.untilDate || '',
+      occurrenceCount: recurrence.occurrenceCount,
+    });
+    console.log({
+      frequency: recurrence.frequency,
+      interval: recurrence.interval,
+      endType: recurrence.endType,
+      untilDate: recurrence.untilDate || '',
+      occurrenceCount: recurrence.occurrenceCount,
+  })
+    console.log(rule)
+    return rule;
+  }, [recurrence]);
+
+  const updateRRuleWithoutDTStart = useCallback((existingRRule: string): string | null => {
+    if (!recurrence.isRecurring) return null;
+    
+    return updateRRuleOptions(existingRRule, {
       frequency: recurrence.frequency,
       interval: recurrence.interval,
       endType: recurrence.endType,
@@ -72,6 +99,10 @@ export function useRecurrenceLogic() {
       occurrenceCount: recurrence.occurrenceCount,
     });
   }, [recurrence]);
+
+  const getLastOccurrence = useCallback((rruleString: string): string | null => {
+    return getLastOccurrenceDate(rruleString);
+  }, []);
 
   const hasFutureOccurrences = useCallback((lesson: Lesson): boolean => {
     if (!lesson.recurrence_rule) return false;
@@ -93,6 +124,19 @@ export function useRecurrenceLogic() {
     }
   }, []);
 
+  // Check if recurrence options have changed (not including DTSTART changes)
+  const hasRecurrenceOptionsChanged = useCallback((): boolean => {
+    if (!originalRecurrence) return false;
+    
+    return (
+      recurrence.frequency !== originalRecurrence.frequency ||
+      recurrence.interval !== originalRecurrence.interval ||
+      recurrence.endType !== originalRecurrence.endType ||
+      recurrence.untilDate !== originalRecurrence.untilDate ||
+      recurrence.occurrenceCount !== originalRecurrence.occurrenceCount
+    );
+  }, [recurrence, originalRecurrence]);
+
   const reset = useCallback(() => {
     setRecurrence({
       isRecurring: false,
@@ -102,6 +146,7 @@ export function useRecurrenceLogic() {
       untilDate: null,
       occurrenceCount: 10,
     });
+    setOriginalRecurrence(null);
   }, []);
 
   return {
@@ -114,7 +159,10 @@ export function useRecurrenceLogic() {
     setOccurrenceCount,
     loadFromRRule,
     generateRRuleString,
+    updateRRuleWithoutDTStart,
+    getLastOccurrence,
     hasFutureOccurrences,
+    hasRecurrenceOptionsChanged,
     reset,
   };
 }

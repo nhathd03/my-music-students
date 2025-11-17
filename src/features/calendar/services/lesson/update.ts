@@ -159,6 +159,10 @@ async function truncateLessonSeries(
   rruleOptions: any,
   untilDate: Date
 ): Promise<void> {
+  console.log("truncating lesson series")
+  console.log("beforeOccurrences", beforeOccurrences)
+  console.log("rruleOptions", rruleOptions)
+  console.log("untilDate", untilDate)
   if (beforeOccurrences.length === 0) {
     await supabase.from('lesson').delete().eq('id', lesson.id);
   } else if (beforeOccurrences.length === 1) {
@@ -172,6 +176,7 @@ async function truncateLessonSeries(
       until: untilDate,
     });
 
+    console.log(truncatedRule)
     await supabase
       .from('lesson')
       .update({ recurrence_rule: truncatedRule.toString() })
@@ -186,6 +191,8 @@ export async function updateSingleOccurrence(
   lesson: Lesson,
   updatedData: LessonInsertData
 ): Promise<void> {
+
+  console.log("updating single occurrence")
   const { data: originalLesson, error: fetchError } = await supabase
     .from('lesson')
     .select('*')
@@ -224,7 +231,6 @@ export async function updateSingleOccurrence(
 
   if (currentIndex === -1) {
     // Compare timestamps by converting both to Date objects
-    // This handles cases where one has 'Z' and the other doesn't
     const originalTimestampDate = new Date(originalLesson.timestamp);
     const lessonTimestampDate = new Date(lesson.timestamp);
     if (originalTimestampDate.getTime() === lessonTimestampDate.getTime()) {
@@ -243,8 +249,6 @@ export async function updateSingleOccurrence(
   // CASE 2: Middle or last occurrence
   const beforeOccurrences = allOccurrences.slice(0, currentIndex);
   const untilDate = new Date(lesson.timestamp);
-  untilDate.setDate(untilDate.getDate() - 1);
-  untilDate.setHours(23, 59, 59, 999);
   await truncateLessonSeries(lesson, beforeOccurrences, rrule.options, untilDate);
 
   // Create the edited occurrence as a single lesson
@@ -295,8 +299,6 @@ export async function updateCurrentAndFutureOccurrences(
   // CASE 2: Not the first occurrence
   const beforeOccurrences = allOccurrences.slice(0, currentIndex);
   const untilDate = new Date(lesson.timestamp);
-  untilDate.setDate(untilDate.getDate() - 1);
-  untilDate.setHours(23, 59, 59, 999);
   await truncateLessonSeries(lesson, beforeOccurrences, oldRule.options, untilDate);
 
   // Create new lesson with updated data starting from this occurrence

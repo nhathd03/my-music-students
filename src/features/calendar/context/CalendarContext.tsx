@@ -51,30 +51,73 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     refetch();
   }, [refetch]);
 
+  
   // Sync recurrence rule with form when recurrence settings change
   useEffect(() => {
-    if (form.formData.date && form.formData.time) {
-      const rrule = recurrence.generateRRuleString(form.formData.date, form.formData.time);
-      if (rrule !== form.formData.recurrence_rule) {
-        form.updateFormData({ recurrence_rule: rrule });
+    console.log(form)
+    // If recurrence is disabled, clear the recurrence_rule
+    if (!recurrence.recurrence.isRecurring) {
+      if (form.formData.recurrence_rule !== null) {
+        form.updateFormData({ recurrence_rule: null });
       }
+      return;
+    }
+
+    // Need both date and time to generate RRule
+    if (!form.formData.date || !form.formData.time) {
+      return;
+    }
+
+    // Check if non-recurrence fields (date/time/duration) changed from original
+    const dateChanged = form.formData.date !== form.originalFormData?.date;
+    const timeChanged = form.formData.time !== form.originalFormData?.time;
+    const durationChanged = form.formData.duration !== form.originalFormData?.duration;
+    const nonRecurrenceFieldsChanged = dateChanged || timeChanged || durationChanged;
+
+    let newRRule: string | null = null;
+
+    if (nonRecurrenceFieldsChanged) {
+      newRRule = recurrence.generateRRuleString(form.formData.date, form.formData.time);
+    } else if (form.originalFormData?.recurrence_rule) {
+      newRRule = recurrence.updateRRuleWithoutDTStart(form.originalFormData.recurrence_rule);
+    } else {
+      newRRule = recurrence.generateRRuleString(form.formData.date, form.formData.time);
+    }
+
+    // Only update if the RRule actually changed
+    if (newRRule !== form.formData.recurrence_rule) {
+      console.log('Updating recurrence_rule:', newRRule);
+      form.updateFormData({ recurrence_rule: newRRule });
     }
   }, [
-    recurrence.recurrence,
+    recurrence.recurrence.isRecurring,
+    recurrence.recurrence.frequency,
+    recurrence.recurrence.interval,
+    recurrence.recurrence.endType,
+    recurrence.recurrence.untilDate,
+    recurrence.recurrence.occurrenceCount,
     form.formData.date,
     form.formData.time,
+    form.formData.duration,
+    form.originalFormData?.date,
+    form.originalFormData?.time,
+    form.originalFormData?.duration,
+    form.originalFormData?.recurrence_rule,
+    recurrence.generateRRuleString,
+    recurrence.updateRRuleWithoutDTStart,
+    form.updateFormData,
   ]);
-
   // Load recurrence settings when editing a recurring lesson
   useEffect(() => {
     if (form.editingLesson?.recurrence_rule) {
+      console.log("hello")
       recurrence.loadFromRRule(form.editingLesson.recurrence_rule);
     }
   }, [form.editingLesson?.recurrence_rule]);
 
-  // Use the handlers hook that encapsulates all the complex handler logic
+
   const handlers = useCalendarHandlers({
-    state,
+    state,   
     dispatch,
     form,
     recurrence,
@@ -101,6 +144,7 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     setOccurrenceCount: recurrence.setOccurrenceCount,
     loadFromRRule: recurrence.loadFromRRule,
     generateRRuleString: recurrence.generateRRuleString,
+    getLastOccurrence: recurrence.getLastOccurrence,
     hasFutureOccurrences: recurrence.hasFutureOccurrences,
     reset: recurrence.reset,
     formData: form.formData,
@@ -110,6 +154,8 @@ export function CalendarProvider({ children }: { children: React.ReactNode }) {
     loadFormData: form.loadFormData,
     updateFormData: form.updateFormData,
     hasFormChanged: () => form.hasChanged,
+    hasRecurrenceChanged: () => form.hasRecurrenceRuleChanged,
+    hasRecurrenceOptionsChanged: () => recurrence.hasRecurrenceOptionsChanged(),
     resetForm: () => {
       form.reset();
       recurrence.reset();

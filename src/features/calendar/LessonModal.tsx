@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useMemo } from 'react';
 import type { LessonModalProps } from './types';
 
 export default function LessonModal({
@@ -7,6 +8,8 @@ export default function LessonModal({
   editingLesson,
   recurrence,
   hasFormChanged,
+  hasRecurrenceOptionsChanged,
+  getLastOccurrence,
   onSubmit,
   onCancel,
   onChange,
@@ -27,6 +30,19 @@ export default function LessonModal({
     occurrenceCount,
     setOccurrenceCount,
   } = recurrence;
+
+  // Calculate the last occurrence date when editing a recurring lesson
+  const calculatedLastOccurrence = useMemo(() => {
+    if (!editingLesson?.recurrence_rule) return null;
+    return getLastOccurrence(editingLesson.recurrence_rule);
+  }, [editingLesson?.recurrence_rule, getLastOccurrence]);
+
+  // When editing a lesson with occurrence count, we show it as "until" date
+  // The endType will be 'count' from the original rule, but we display the last occurrence date
+  const displayEndType = editingLesson && endType === 'count' ? 'until' : endType;
+  const displayUntilDate = editingLesson && endType === 'count' && calculatedLastOccurrence 
+    ? calculatedLastOccurrence 
+    : untilDate;
 
   const handleClose = () => {
     if (onRequestClose) {
@@ -128,6 +144,13 @@ export default function LessonModal({
 
           {isRecurring && (
             <div className="recurring-options">
+              {/* Warning message when editing recurring lesson and recurrence options have changed */}
+              {editingLesson && hasRecurrenceOptionsChanged && (
+                <div className="recurrence-warning">
+                  ⚠️ Changing the recurrence will update all future entries.
+                </div>
+              )}
+              
               {/* Frequency and Interval */}
               <div className="recurrence-pattern">
                 <label className="label">Repeat every</label>
@@ -162,58 +185,60 @@ export default function LessonModal({
                       type="radio"
                       name="endType"
                       value="never"
-                      checked={endType === 'never'}
+                      checked={displayEndType === 'never'}
                       onChange={(e) => setEndType(e.target.value as 'never')}
                     />
                     <span>Never</span>
                   </label>
 
-                  {/* Until Date */}
+                  {/* Until Date - When editing with count, show the calculated last occurrence */}
                   <label className="end-option">
                     <input
                       type="radio"
                       name="endType"
                       value="until"
-                      checked={endType === 'until'}
+                      checked={displayEndType === 'until'}
                       onChange={(e) => setEndType(e.target.value as 'until')}
                     />
                     <span>On</span>
                     <input
                       type="date"
                       className="input date-input"
-                      value={untilDate}
+                      value={displayUntilDate || ''}
                       onChange={(e) => {
                         setUntilDate(e.target.value);
                         setEndType('until');
                       }}
-                      disabled={endType !== 'until'}
+                      disabled={displayEndType !== 'until'}
                     />
                   </label>
 
-                  {/* After X Occurrences */}
-                  <label className="end-option">
-                    <input
-                      type="radio"
-                      name="endType"
-                      value="count"
-                      checked={endType === 'count'}
-                      onChange={(e) => setEndType(e.target.value as 'count')}
-                    />
-                    <span>After</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={999}
-                      className="input count-input"
-                      value={occurrenceCount}
-                      onChange={(e) => {
-                        setOccurrenceCount(Number(e.target.value));
-                        setEndType('count');
-                      }}
-                      disabled={endType !== 'count'}
-                    />
-                    <span>occurrence(s)</span>
-                  </label>
+                  {/* After X Occurrences - Only show when creating, hide when editing */}
+                  {!editingLesson && (
+                    <label className="end-option">
+                      <input
+                        type="radio"
+                        name="endType"
+                        value="count"
+                        checked={endType === 'count'}
+                        onChange={(e) => setEndType(e.target.value as 'count')}
+                      />
+                      <span>After</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={999}
+                        className="input count-input"
+                        value={occurrenceCount}
+                        onChange={(e) => {
+                          setOccurrenceCount(Number(e.target.value));
+                          setEndType('count');
+                        }}
+                        disabled={endType !== 'count'}
+                      />
+                      <span>occurrence(s)</span>
+                    </label>
+                  )}
                 </div>
               </div>
             </div>
